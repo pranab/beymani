@@ -18,6 +18,8 @@
 package org.beymani.dist;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -30,6 +32,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
@@ -40,21 +43,21 @@ import org.chombo.util.Tuple;
 import org.chombo.util.Utility;
 import org.codehaus.jackson.map.ObjectMapper;
 
-public  class MultiVariateDistribution extends Configured implements Tool {
+public class DistributionSorter extends Configured implements Tool {
 
 	@Override
 	public int run(String[] args) throws Exception {
         Job job = new Job(getConf());
-        String jobName = "Muti variate distribution  MR";
+        String jobName = "Muti variate distribution sorter  MR";
         job.setJobName(jobName);
         
-        job.setJarByClass(MultiVariateDistribution.class);
+        job.setJarByClass(DistributionSorter.class);
         
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
         
-        job.setMapperClass(MultiVariateDistribution.HistogramMapper.class);
-        job.setReducerClass(MultiVariateDistribution.HistogramReducer.class);
+        job.setMapperClass(DistributionSorter.SorterMapper.class);
+        job.setReducerClass(DistributionSorter.SorterReducer.class);
         
         job.setMapOutputKeyClass(Tuple.class);
         job.setMapOutputValueClass(Text.class);
@@ -68,15 +71,18 @@ public  class MultiVariateDistribution extends Configured implements Tool {
         int status =  job.waitForCompletion(true) ? 0 : 1;
         return status;
 	}
-
-	public static class HistogramMapper extends Mapper<LongWritable, Text, Tuple , Text> {
+	
+	public static class SorterMapper extends Mapper<LongWritable, Text, Tuple , Text> {
 		private Tuple outKey = new Tuple();
 		private Text outVal = new Text();
         private String fieldDelimRegex;
         private HistogramSchema schema;
-        private String keyCompSt;
-        private Integer keyCompInt;
-        private int numFields;
+        private String[] bucketKeys;
+        private String  bucketValues;
+        private String itemDelim;
+        private Integer valueCount;
+        private byte[] bucketKeyTypes;
+        
         
         protected void setup(Context context) throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
@@ -88,66 +94,53 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             FSDataInputStream fs = dfs.open(src);
             ObjectMapper mapper = new ObjectMapper();
             schema = mapper.readValue(fs, HistogramSchema.class);
+        	itemDelim = conf.get("item.delim", ",");
+        	
+        	List<Byte> dataTypes = new ArrayList<Byte>();
+            for (HistogramField field : schema.getFields()) {
+            	if (field.isCategorical()){
+            		dataTypes.add( Tuple.STRING);
+            	} else if (field.isInteger() || field.isDouble()) {
+            		dataTypes.add(Tuple.INT);
+            	}
+            }
             
-            numFields = schema.getFields().size();
+            bucketKeyTypes = new byte[dataTypes.size()];
+            for (int i = 0; i < bucketKeyTypes.length; ++i) {
+            	bucketKeyTypes[i] = dataTypes.get(i);
+            }
+            System.out.println("Num bucket key types:" + bucketKeyTypes.length);
        }
 
         @Override
         protected void map(LongWritable key, Text value, Context context)
             throws IOException, InterruptedException {
             String[] items  =  value.toString().split(fieldDelimRegex);
-            if ( items.length  != numFields){
+            if ( items.length  != 2){
             	context.getCounter("Data", "Invalid").increment(1);
             	return;
             }
+            bucketKeys = items[0].split(itemDelim);
+            bucketValues = items[1];
+            valueCount = bucketValues.split(itemDelim).length;
             
             outKey.initialize();
-            for (HistogramField field : schema.getFields()) {
-            	String	item = items[field.getOrdinal()];
-            	if (field.isCategorical()){
-            		keyCompSt = item;
-            		outKey.add(keyCompSt);
-            	} else if (field.isInteger()) {
-            		 keyCompInt = Integer.parseInt(item) /  field.getBucketWidth();
-            		outKey.add(keyCompInt);
-            	} else if (field.isDouble()) {
-            		 keyCompInt = ((int)Double.parseDouble(item)) /  field.getBucketWidth();
-            		outKey.add(keyCompInt);
-            	} else if (field.isId()) {
-            		outVal.set(item);
-            	}
-            }
+            outKey.add(bucketKeyTypes, bucketKeys);
+            outKey.prepend(valueCount);
+            outVal.set(bucketValues);
         	context.getCounter("Data", "Processed record").increment(1);
 			context.write(outKey, outVal);
        }
 	}
-	
-    public static class HistogramReducer extends Reducer<Tuple, Text, NullWritable, Text> {
-    	private Text valueOut = new Text();
-    	private String fieldDelim ;
-        private String itemDelim;
-        
-        protected void setup(Context context) throws IOException, InterruptedException {
-			Configuration conf = context.getConfiguration();
-        	fieldDelim = conf.get("field.delim", "[]");
-        	itemDelim = conf.get("item.delim", ",");
-        }    	
+
+    public static class SorterReducer extends Reducer<Tuple, Text, NullWritable, Text> {
         
     	protected void reduce(Tuple key, Iterable<Text> values, Context context)
         	throws IOException, InterruptedException {
-   		    StringBuilder stBld = new  StringBuilder();
-   		    boolean first = true;
         	for (Text value : values){
-        		if (first) {
-        			stBld.append(value.toString());
-        			first = false;
-        		} else {
-        			stBld.append(itemDelim).append(value.toString());
-        		}
+    			context.write(NullWritable.get(), value);
+    			break;
         	}    	
-        	key.setDelim(itemDelim);
-        	valueOut.set(key.toString() + fieldDelim + stBld.toString());
-			context.write(NullWritable.get(), valueOut);
     	}
     }
  
@@ -155,7 +148,8 @@ public  class MultiVariateDistribution extends Configured implements Tool {
 	 * @param args
 	 */
 	public static void main(String[] args) throws Exception {
-        int exitCode = ToolRunner.run(new MultiVariateDistribution(), args);
+        int exitCode = ToolRunner.run(new DistributionSorter(), args);
         System.exit(exitCode);
 	}
+
 }
