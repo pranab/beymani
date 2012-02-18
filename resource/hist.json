@@ -1,0 +1,28 @@
+{
+	"fields" :
+	[
+		{
+			"name" : "xid",
+			"ordinal" : 0,
+			"id" : true,
+			"dataType" : "string"
+		},
+		{
+			"name" : "time",
+			"ordinal" : 1,
+			"dataType" : "int",
+			"bucketWidth" : 60
+		},
+		{
+			"name" : "amount",
+			"ordinal" : 2,
+			"dataType" : "double",
+			"bucketWidth" : 100
+		},
+		{
+			"name" : "vendor",
+			"ordinal" : 3,
+			"dataType" : "categorical"
+		}
+	]
+}
