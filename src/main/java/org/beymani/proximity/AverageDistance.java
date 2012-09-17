@@ -38,6 +38,10 @@ import org.apache.hadoop.util.ToolRunner;
 import org.chombo.util.TextInt;
 import org.chombo.util.Utility;
 
+/**
+ * @author pranab
+ *
+ */
 public class AverageDistance extends Configured implements Tool {
 
 	@Override
@@ -71,59 +75,129 @@ public class AverageDistance extends Configured implements Tool {
         return status;
 	}
 	
+	/**
+	 * @author pranab
+	 *
+	 */
 	public static class TopMatchesMapper extends Mapper<LongWritable, Text, TextInt, Text> {
 		private String srcEntityId;
 		private String trgEntityId;
 		private int rank;
 		private TextInt outKey = new TextInt();
 		private Text outVal = new Text();
+        private String fieldDelimRegex;
+        private String fieldDelim;
 
+        protected void setup(Context context) throws IOException, InterruptedException {
+           	fieldDelim = context.getConfiguration().get("field.delim", ",");
+            fieldDelimRegex = context.getConfiguration().get("field.delim.regex", "\\[\\]");
+        }    
+		
         @Override
         protected void map(LongWritable key, Text value, Context context)
             throws IOException, InterruptedException {
-            String[] items  =  value.toString().split(",");
+            String[] items  =  value.toString().split(fieldDelimRegex);
             srcEntityId = items[0];
             trgEntityId = items[1];
             rank = Integer.parseInt(items[items.length - 1]);
             outKey.set(srcEntityId, rank);
-            outVal.set(trgEntityId + "," + items[items.length - 1]);
+            outVal.set(trgEntityId + fieldDelim + items[items.length - 1]);
 			context.write(outKey, outVal);
         }
 	}
 	
+    /**
+     * @author pranab
+     *
+     */
     public static class TopMatchesReducer extends Reducer<TextInt, Text, NullWritable, Text> {
     	private int topMatchCount;
+		private String trgEntityId;
 		private String srcEntityId;
 		private int count;
 		private int sum;
 		private int dist;
 		private Text outVal = new Text();
-    	
+		private boolean doAverage;
+		private boolean doDensity;
+		private boolean doGrouping;
+		private int densityScale;
+		private int avg;
+		private int density;
+        private String fieldDelim;
+        private String fieldDelimRegex;
+        private String[] items;
+        private int grMemeberIndex;
+        
+        
+        /* (non-Javadoc)
+         * @see org.apache.hadoop.mapreduce.Reducer#setup(org.apache.hadoop.mapreduce.Reducer.Context)
+         */
         protected void setup(Context context) throws IOException, InterruptedException {
+           	fieldDelim = context.getConfiguration().get("field.delim", ",");
+            fieldDelimRegex = context.getConfiguration().get("field.delim.regex", "\\[\\]");
         	topMatchCount = context.getConfiguration().getInt("top.match.count", 10);
-        }
+            doAverage = context.getConfiguration().getBoolean("top.match.average", true);
+            doDensity = context.getConfiguration().getBoolean("top.match.density", false);
+            doGrouping = context.getConfiguration().getBoolean("top.match.grouping", false);
+            densityScale = context.getConfiguration().getInt("top.match.density.scale", 1000000);
+                        
+         }
     	
+    	/* (non-Javadoc)
+    	 * @see org.apache.hadoop.mapreduce.Reducer#reduce(KEYIN, java.lang.Iterable, org.apache.hadoop.mapreduce.Reducer.Context)
+    	 */
     	protected void reduce(TextInt key, Iterable<Text> values, Context context)
-        	throws IOException, InterruptedException {
+        	throws IOException,  InterruptedException {
     		srcEntityId  = key.getFirst().toString();
     		count = 0;
     		sum = 0;
+    		grMemeberIndex = 0;
+    		if (doGrouping) {
+    			outVal.set(srcEntityId + fieldDelim + srcEntityId + fieldDelim + grMemeberIndex);	
+    			context.write(NullWritable.get(), outVal);
+    			++grMemeberIndex;
+    		}
+    		
         	for (Text value : values){
-        		dist = Integer.parseInt(value.toString().split(",")[1]);
-        		sum += dist;
+        		 items  = value.toString().split(fieldDelimRegex);
+        		
+        		if (doAverage || doDensity) {
+        			dist = Integer.parseInt(items[1]);
+        			sum += dist;
+        		} else {
+        			trgEntityId = items[0];
+           			outVal.set(trgEntityId + fieldDelim + srcEntityId + fieldDelim + grMemeberIndex);	
+        			context.write(NullWritable.get(), outVal);
+        			++grMemeberIndex;
+            		}
         		if (++count == topMatchCount){
         			break;
         		}
         	} 
+        	 
+    		if (doAverage || doDensity) {
+    			avg = sum / count;
+    		}
+    		
+        	if (doDensity) {
+        		density =  densityScale / avg;
+        		outVal.set(srcEntityId +fieldDelim + density);
+        	} else if (doAverage) {
+        		outVal.set(srcEntityId + fieldDelim + avg);
+        	}
         	
-        	int avg = sum / count;
-    		outVal.set(srcEntityId + "," + avg);
-			context.write(NullWritable.get(), outVal);
-        	
+    		if (doAverage || doDensity) {
+    			context.write(NullWritable.get(), outVal);
+    		}
     	}
     	
     }
 	
+    /**
+     * @author pranab
+     *
+     */
     public static class IdRankPartitioner extends Partitioner<TextInt, Text> {
 	     @Override
 	     public int getPartition(TextInt key, Text value, int numPartitions) {
@@ -133,6 +207,10 @@ public class AverageDistance extends Configured implements Tool {
 	     }
    }
     
+    /**
+     * @author pranab
+     *
+     */
     public static class IdRankGroupComprator extends WritableComparator {
     	protected IdRankGroupComprator() {
     		super(TextInt.class, true);
