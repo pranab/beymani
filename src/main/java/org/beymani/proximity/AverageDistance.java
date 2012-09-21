@@ -47,7 +47,7 @@ public class AverageDistance extends Configured implements Tool {
 	@Override
 	public int run(String[] args) throws Exception {
         Job job = new Job(getConf());
-        String jobName = "Nearest neighbour  n  avearge distance MR";
+        String jobName = "Nearest neighbour stat calculation  MR";
         job.setJobName(jobName);
         
         job.setJarByClass(AverageDistance.class);
@@ -154,6 +154,7 @@ public class AverageDistance extends Configured implements Tool {
     		sum = 0;
     		grMemeberIndex = 0;
     		if (doGrouping) {
+    			//group leader
     			outVal.set(srcEntityId + fieldDelim + srcEntityId + fieldDelim + grMemeberIndex);	
     			context.write(NullWritable.get(), outVal);
     			++grMemeberIndex;
@@ -163,14 +164,17 @@ public class AverageDistance extends Configured implements Tool {
         		 items  = value.toString().split(fieldDelimRegex);
         		
         		if (doAverage || doDensity) {
+        			//average distance or density
         			dist = Integer.parseInt(items[1]);
         			sum += dist;
         		} else {
+        			//neighborhood group - entity, group, memebership number
         			trgEntityId = items[0];
            			outVal.set(trgEntityId + fieldDelim + srcEntityId + fieldDelim + grMemeberIndex);	
         			context.write(NullWritable.get(), outVal);
         			++grMemeberIndex;
-            		}
+            	}
+        		
         		if (++count == topMatchCount){
         			break;
         		}
@@ -181,6 +185,7 @@ public class AverageDistance extends Configured implements Tool {
     		}
     		
         	if (doDensity) {
+        		avg = avg == 0 ? 1 : avg;
         		density =  densityScale / avg;
         		outVal.set(srcEntityId +fieldDelim + density);
         	} else if (doAverage) {
