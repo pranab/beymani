@@ -148,14 +148,12 @@ public class NeighborDensity  extends Configured implements Tool {
     	 */
     	protected void reduce(TextInt key, Iterable<Tuple> values, Context context)
             	throws IOException,  InterruptedException {
-    		boolean first = true;
     		entityID = key.getFirst().toString();
 			LOG.debug("entityID:" + entityID);
     		for (Tuple val : values) {
     			LOG.debug("value tuple size:" + val.getSize());
-    			if (first) {
+    			if (val.getSize() == 1) {
     				density = val.getInt(0);
-    				first = false;
     			} else {
     				group = val.getString(0);
     				outVal.set(group + fieldDelim + entityID + fieldDelim + density);
