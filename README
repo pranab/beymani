@@ -1,11 +1,35 @@
 Introduction
 ============
 
-Beymani consists of set of Hadoop based tools for outlier and anamoly detection, which can be 
-used for fraud detection.
+Beymani consists of set of Hadoop based tools for outlier and anamoly 
+detection, which can be used for fraud detection.
 
 
-Configuration
-=============
+Distribution Method
+===================
+Use the MR  class MultiVarHistogram from the project chombo. As the name 
+suggests it calculates multivariate distribution and detects outliers. 
+Here is my blog post on this
+
+http://pkghosh.wordpress.com/2012/02/18/fraudsters-are-not-model-citizens/
+
+Average Distance
+================
+Use SameTypeSimilarity MR from the sifarish, to find pair wise distance  
+for all data points. The outout of this MR is used as input to 
+AverageDistance MR in this  project. Here is the relevanr blog post on this
+
+http://pkghosh.wordpress.com/2012/06/18/its-a-lonely-life-for-outliers/
+
+Relative Density
+================
+This approach is appropriate when the feature space is not homogegeneous 
+and density varie. First, use SameTypeSimilrity to find pairwise distance.
+Then use AverageDistance MR to find density. Use AverageDistance MR again
+to find neighborhood groups. Use the results of the last two steps and and 
+run NeighborDensity to find group wise density of each data point. Finally
+run the MR RelativeDensity to find relative density of each point
+
+More Coming.......
 
 

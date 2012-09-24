@@ -150,6 +150,7 @@ public class NeighborDensity  extends Configured implements Tool {
             	throws IOException,  InterruptedException {
     		entityID = key.getFirst().toString();
 			LOG.debug("entityID:" + entityID);
+			
     		for (Tuple val : values) {
     			LOG.debug("value tuple size:" + val.getSize());
     			if (val.getSize() == 1) {
