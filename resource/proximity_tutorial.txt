@@ -1,0 +1,52 @@
+This tutorial provides details of finding outliers based on average distance to neighbors.
+It uses two MR  jobs, SameTypeSimilarity and AverageDistance. If you want to use credit card 
+transactions as input, you could use cct.rb to generate data.
+
+Transaction Simarity
+====================
+Herte is the script for SameTypeSimilarity
+
+JAR_NAME=/home/pranab/Projects/sifarish/target/sifarish-1.0.jar
+CLASS_NAME=org.sifarish.feature.SameTypeSimilarity
+
+echo "running mr"
+IN_PATH=/user/pranab/cct/input
+OUT_PATH=/user/pranab/cct/simi
+echo "input $IN_PATH output $OUT_PATH"
+hadoop fs -rmr $OUT_PATH
+echo "removed output dir"
+
+hadoop jar $JAR_NAME  $CLASS_NAME -Dconf.path=/home/pranab/Projects/bin/fraud/cct.properties  $IN_PATH  $OUT_PATH
+
+Average Ditsance to Neighbors
+=============================
+Here is a sample script for AverageDistance
+
+JAR_NAME=/home/pranab/Projects/beymani/target/beymani-1.0.jar
+CLASS_NAME=org.beymani.proximity.AverageDistance
+
+echo "running mr"
+IN_PATH=/user/pranab/cct/simi
+OUT_PATH=/user/pranab/cct/avdi
+echo "input $IN_PATH output $OUT_PATH"
+hadoop fs -rmr $OUT_PATH
+echo "removed output dir"
+
+hadoop jar $JAR_NAME  $CLASS_NAME -Dconf.path=/home/pranab/Projects/bin/fraud/cct.properties  $IN_PATH  $OUT_PATH
+
+Configuration
+=============
+Here is a sample cct.properties
+
+field.delim.regex=,
+field.delim=,
+num.reducer=1
+bucket.count=1000
+same.schema.file.path=/pranab/meta/prod/prod.json
+top.match.count=10
+top.match.average=true
+top.match.density=false
+top.match.grouping=false
+
+
+
