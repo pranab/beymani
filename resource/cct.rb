@@ -1,3 +1,7 @@
+#!/usr/bin/ruby
+
+count = ARGV[0].to_i
+
 amount_dist = [
 10,10,
 17,17,17,
@@ -150,7 +154,12 @@ key = ['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','G','H','
 
 def gen_id(key)
 	id = ''
-	1.upto 8 do 
+	1.upto 8 do #!/usr/bin/ruby
+
+require '../lib/util.rb'      
+
+userCount = ARGV[0].to_i
+
 		id << key[rand(key.length)]
 	end
 	return id
@@ -173,7 +182,7 @@ def sample(dist, mult, floor, percent)
 	val
 end
 
-1.upto 10000 do 
+1.upto count do 
 	id = gen_id(key)
 	time = sample(time_dist, 60, 2, 8)
 	v = vendor_dist[rand(vendor_dist.length)]
