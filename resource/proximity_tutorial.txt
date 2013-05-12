@@ -1,6 +1,8 @@
 This tutorial provides details of finding outliers based on average distance to neighbors.
 It uses two MR  jobs, SameTypeSimilarity and AverageDistance. If you want to use credit card 
-transactions as input, you could use cct.rb to generate data.
+transactions as input, you could use cct.rb to generate data. Make sure that utol.rb is in the path
+../lib. util.rb can be checked out from my  project visitante. It's under script/ruby/lib directory
+in that project.
 
 Transaction Simarity
 ====================
