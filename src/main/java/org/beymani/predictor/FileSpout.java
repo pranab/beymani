@@ -17,7 +17,12 @@
 
 package org.beymani.predictor;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Map;
+import java.util.Scanner;
 
 import backtype.storm.spout.SpoutOutputCollector;
 import backtype.storm.task.TopologyContext;
@@ -28,29 +33,66 @@ import backtype.storm.tuple.Values;
 
 public class FileSpout extends BaseRichSpout {
     private SpoutOutputCollector collector;
-
+    private Map conf;
+    private File[] files;
+    private Scanner scanner;
+    private int curFileIndex = 0;
+    
 	@Override
 	public void open(Map conf, TopologyContext context,
 			SpoutOutputCollector collector) {
 		this.collector = collector;
+		this.conf = conf;
 		
+		String dirPath = conf.get("file.spout.dir.path").toString();
+		File dir = new File(dirPath);
+		files = dir.listFiles();
+		Arrays.sort(files, new Comparator<File>(){
+		    public int compare(File f1, File f2) {
+		    	int res = f1.lastModified() < f2.lastModified() ? -1 : ( f1.lastModified() > f2.lastModified() ? 1 : 0);
+		        return res;
+		    } });
+		
+		openNextFile();
 	}
 
 	@Override
 	public void nextTuple() {
 		String record = readFile();
-		collector.emit(new Values(record));
+		String[] items = record.split("\\s+");
+		String entityID = items[0];
+		String recordData = items[1];
+		collector.emit(new Values(entityID, recordData));
 	}
 
 	private String readFile() {
-		String record = "";
-		
+		String record = null;
+		if (scanner.hasNextLine()) {
+			 record =  scanner.nextLine();
+		 } else {
+			 if (++curFileIndex < files.length) {
+					openNextFile();
+					if (scanner.hasNextLine()) {
+						 record =  scanner.nextLine();
+					 }				 
+			 } else {
+				 //no more files to read
+			 }
+		 }
 		return record;
 	}
 	
+	private void openNextFile() {
+		try {
+			scanner = new Scanner(files[curFileIndex]);
+		} catch (FileNotFoundException e) {
+			throw new IllegalStateException("file not found");
+		}
+	}
+
 	@Override
 	public void declareOutputFields(OutputFieldsDeclarer declarer) {
-        declarer.declare(new Fields("record"));
+        declarer.declare(new Fields("entityID", "recordData"));		
 	}
 	
 }	

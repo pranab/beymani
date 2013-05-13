@@ -21,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,24 +35,31 @@ import org.chombo.util.Utility;
  *
  */
 public class MarkovModelPredictor extends ModelBasedPredictor {
-	private String[] states;
+	private List<String> states;
 	private double[][] stateTranstionProb;
 	private Map<String, List<String>> records = new HashMap<String, List<String>>(); 
 	private Map<String, List<String>> stateSequences = new HashMap<String, List<String>>(); 
 	private int stateSeqWindowSize;
 	
 	public MarkovModelPredictor(Map conf)   {
-		states = conf.get("model.states").toString().split(",");
+		String[] statesArr = conf.get("model.states").toString().split(",");
+		states = Arrays.asList(statesArr);
+
 		String stateTranFile = conf.get("model.stateTransition.file").toString();
-		int size = states.length;
+		int size = states.size();
 		stateTranstionProb = new double[size][size];
 		
 		Scanner scanner;
 		try {
 			scanner = new Scanner(new FileInputStream(stateTranFile));
+			int row = 0;
 			 while (scanner.hasNextLine()){
+			        if (row == size) {
+			        	throw new IllegalStateException("Invalid state transition matrix");
+			        }
 			        String line = scanner.nextLine();
-			        Utility.deseralizeTableRow(stateTranstionProb, line, ",",size,size);
+			        Utility.deseralizeTableRow(stateTranstionProb, line, ",", row, size);
+			        ++row;
 			 }      		
 		} catch (FileNotFoundException e) {
 			throw new IllegalArgumentException("Failed to open state transition probability file");
@@ -91,9 +99,25 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		return score;
 	}
 	
+	/**
+	 * @param stateSeq
+	 * @return
+	 */
 	private double getScore(List<String> stateSeq) {
-		
-		return 0; 
+		boolean first  = true;
+		int curIndex = 0, preIndex = 0;
+		double condPrDist = 0;
+		for (String state : stateSeq) {
+			if (first) {
+				curIndex = states.indexOf(state);
+				first = false;
+			} else {
+				preIndex = curIndex;
+				curIndex = states.indexOf(state);
+				condPrDist += Math.log(stateTranstionProb[preIndex][curIndex]);
+			}
+		}
+		return condPrDist; 
 	}
 
 }

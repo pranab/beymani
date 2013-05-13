@@ -62,7 +62,9 @@ public class OutlierPredictor {
 		public void execute(Tuple input) {
 			String entityID = input.getString(0);
 			String record  = input.getString(1);
+			double score = predictor.execute( entityID,  record);
 			
+			//write score to db
 		}
 
 		@Override
