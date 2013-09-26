@@ -31,11 +31,18 @@ import backtype.storm.topology.base.BaseRichSpout;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
 
+/**
+ * @author pranab
+ *
+ */
 public class FileSpout extends BaseRichSpout {
     private SpoutOutputCollector collector;
     private Map conf;
     private File[] files;
     private Scanner scanner;
+    /**
+     * 
+     */
     private int curFileIndex = 0;
     
 	@Override
@@ -65,6 +72,9 @@ public class FileSpout extends BaseRichSpout {
 		collector.emit(new Values(entityID, recordData));
 	}
 
+	/**
+	 * @return
+	 */
 	private String readFile() {
 		String record = null;
 		if (scanner.hasNextLine()) {
@@ -82,6 +92,9 @@ public class FileSpout extends BaseRichSpout {
 		return record;
 	}
 	
+	/**
+	 * 
+	 */
 	private void openNextFile() {
 		try {
 			scanner = new Scanner(files[curFileIndex]);
@@ -90,6 +103,9 @@ public class FileSpout extends BaseRichSpout {
 		}
 	}
 
+	/* (non-Javadoc)
+	 * @see backtype.storm.topology.IComponent#declareOutputFields(backtype.storm.topology.OutputFieldsDeclarer)
+	 */
 	@Override
 	public void declareOutputFields(OutputFieldsDeclarer declarer) {
         declarer.declare(new Fields("entityID", "recordData"));		

@@ -40,7 +40,6 @@ import backtype.storm.tuple.Values;
  *
  */
 public class OutlierPredictor {
-
 	
 	/**
 	 * @author pranab
@@ -50,6 +49,9 @@ public class OutlierPredictor {
         private OutputCollector collector;
         private ModelBasedPredictor predictor;
 
+		/* (non-Javadoc)
+		 * @see backtype.storm.task.IBolt#prepare(java.util.Map, backtype.storm.task.TopologyContext, backtype.storm.task.OutputCollector)
+		 */
 		public void prepare(Map stormConf, TopologyContext context,
 				OutputCollector collector) {
 			this.collector = collector;
@@ -59,6 +61,9 @@ public class OutlierPredictor {
 			}
 		}
 		
+		/* (non-Javadoc)
+		 * @see backtype.storm.task.IBolt#execute(backtype.storm.tuple.Tuple)
+		 */
 		public void execute(Tuple input) {
 			String entityID = input.getString(0);
 			String record  = input.getString(1);
@@ -94,7 +99,7 @@ public class OutlierPredictor {
         //spout
         TopologyBuilder builder = new TopologyBuilder();
         int spoutThreads = Integer.parseInt(configProps.getProperty("predictor.spout.threads"));
-        builder.setSpout("fileSpout", new FileSpout(), spoutThreads);
+        builder.setSpout("redisSpout", new RedisSpout(), spoutThreads);
         
         //detector bolt
         int boltThreads = Integer.parseInt(configProps.getProperty("predictor.bolt.threads"));

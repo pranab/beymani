@@ -17,9 +17,6 @@
 
 package org.beymani.predictor;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,6 +25,8 @@ import java.util.Map;
 import java.util.Scanner;
 
 import org.chombo.util.Utility;
+
+import redis.clients.jedis.Jedis;
 
 /**
  * Predictor based on markov model
@@ -39,41 +38,52 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	private double[][] stateTranstionProb;
 	private Map<String, List<String>> records = new HashMap<String, List<String>>(); 
 	private Map<String, List<String>> stateSequences = new HashMap<String, List<String>>(); 
+	private boolean globalPredictor;
+	private boolean localPredictor;
 	private int stateSeqWindowSize;
 	
+	/**
+	 * @param conf
+	 */
 	public MarkovModelPredictor(Map conf)   {
-		String[] statesArr = conf.get("model.states").toString().split(",");
-		states = Arrays.asList(statesArr);
-
-		String stateTranFile = conf.get("model.stateTransition.file").toString();
-		int size = states.size();
-		stateTranstionProb = new double[size][size];
+		String redisHost = conf.get("redis.server.host").toString();
+		int redisPort = new Integer(conf.get("redis.server.port").toString());
+		Jedis jedis = new Jedis(redisHost, redisPort);
+		String modelKey =  conf.get("redis.markov.model.key").toString();
+		String model = jedis.get(modelKey);
 		
-		Scanner scanner;
-		try {
-			scanner = new Scanner(new FileInputStream(stateTranFile));
-			int row = 0;
-			 while (scanner.hasNextLine()){
-			        if (row == size) {
-			        	throw new IllegalStateException("Invalid state transition matrix");
-			        }
-			        String line = scanner.nextLine();
-			        Utility.deseralizeTableRow(stateTranstionProb, line, ",", row, size);
-			        ++row;
-			 }      		
-		} catch (FileNotFoundException e) {
-			throw new IllegalArgumentException("Failed to open state transition probability file");
+		Scanner scanner = new Scanner(model);
+		int lineCount = 0;
+		int numStates = 0;
+		int row = 0;
+		while (scanner.hasNextLine()) {
+		  String line = scanner.nextLine();
+		  if (0 == lineCount) {
+			  //states
+			  String[] items = line.split(",");
+			  states = Arrays.asList(items);
+			  numStates = items.length;
+			  stateTranstionProb = new double[numStates][numStates];
+		  } else {
+		        Utility.deseralizeTableRow(stateTranstionProb, line, ",", row, numStates);
+		        ++row;
+		  }
+		  ++lineCount;
 		}
 
 		 scanner.close();
-		 stateSeqWindowSize =  Integer.parseInt(conf.get("state.seq.window.size").toString());
+		 globalPredictor = Boolean.parseBoolean(conf.get("global.predictor").toString());
+		 localPredictor = Boolean.parseBoolean(conf.get("local.predictor").toString());
+		 if (localPredictor) {
+			 stateSeqWindowSize =  Integer.parseInt(conf.get("state.seq.window.size").toString());
+		 }
 	}
 
 	@Override
 	public double execute(String entityID, String record) {
 		List<String> recordPair = records.get(entityID);
 		if (null == recordPair) {
-			recordPair = new ArrayList<String>();;
+			recordPair = new ArrayList<String>();
 		}
 		recordPair.add(record);
 		if (recordPair.size() > 2) {
