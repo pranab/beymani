@@ -174,6 +174,22 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 				paramG += 1;
 			}
 		} else if (detectionAlgorithm == DetectionAlgorithm.MissRate) {
+			for (int i = 1; i < stateSeq.length; ++i ){
+				int prState = states.indexOf(stateSeq[i -1]);
+				int cuState = states.indexOf(stateSeq[i ]);
+				
+				//if target is max prob state then 0 else 1
+				double maxProb = 0;
+				int maxprobStateIndex = - 1;
+				for (int j = 0; j < states.size(); ++ j) {
+					if ( stateTranstionProb[prState][j] > maxProb) {
+						maxProb = stateTranstionProb[prState][j];
+						maxprobStateIndex = i;
+					}
+				}
+				paramF += (cuState == maxprobStateIndex? 0 : 1);
+				paramG += 1;
+			}
 			
 		}
 		
@@ -201,11 +217,26 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 				}
 				paramG += 1;
 			}
-			params.setLeft(params.getLeft() + paramF);
-			params.setRight(params.getRight() + paramG);
 		} else if (detectionAlgorithm == DetectionAlgorithm.MissRate) {
-			
+			for (int i = 1; i < stateSeq.length; ++i ){
+				int prState = states.indexOf(stateSeq[i -1]);
+				int cuState = states.indexOf(stateSeq[i ]);
+				
+				//if target is max prob state then 0 else 1
+				double maxProb = 0;
+				int maxprobStateIndex = - 1;
+				for (int j = 0; j < states.size(); ++ j) {
+					if ( stateTranstionProb[prState][j] > maxProb) {
+						maxProb = stateTranstionProb[prState][j];
+						maxprobStateIndex = i;
+					}
+				}
+				paramF += (cuState == maxprobStateIndex? 0 : 1);
+				paramG += 1;
+			}
 		}
+		params.setLeft(params.getLeft() + paramF);
+		params.setRight(params.getRight() + paramG);
 		
 		metric = params.getLeft() / params.getRight();	
 		return metric;
