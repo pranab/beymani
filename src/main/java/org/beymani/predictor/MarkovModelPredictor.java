@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
+import org.chombo.util.Pair;
 import org.chombo.util.Utility;
 
 import redis.clients.jedis.Jedis;
@@ -37,10 +38,17 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	private List<String> states;
 	private double[][] stateTranstionProb;
 	private Map<String, List<String>> records = new HashMap<String, List<String>>(); 
-	private Map<String, List<String>> stateSequences = new HashMap<String, List<String>>(); 
-	private boolean globalPredictor;
 	private boolean localPredictor;
 	private int stateSeqWindowSize;
+	private int stateOrdinal;
+	private enum DetectionAlgorithm {
+		MissProbability, 
+		MissRate, 
+		EntropyReduction
+	};
+	private 	DetectionAlgorithm detectionAlgorithm;
+	private Map<String, Pair<Double, Double>> globalParams;
+	private double metricThreshold;
 	
 	/**
 	 * @param conf
@@ -65,69 +73,143 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			  numStates = items.length;
 			  stateTranstionProb = new double[numStates][numStates];
 		  } else {
+			  //populate state transtion probability
 		        Utility.deseralizeTableRow(stateTranstionProb, line, ",", row, numStates);
 		        ++row;
 		  }
 		  ++lineCount;
 		}
-
 		 scanner.close();
-		 globalPredictor = Boolean.parseBoolean(conf.get("global.predictor").toString());
 		 localPredictor = Boolean.parseBoolean(conf.get("local.predictor").toString());
 		 if (localPredictor) {
 			 stateSeqWindowSize =  Integer.parseInt(conf.get("state.seq.window.size").toString());
+		 }  else {
+			 stateSeqWindowSize = 5;
+			 globalParams = new HashMap<String, Pair<Double, Double>>();
 		 }
+		 //state value ordinal within record
+		 stateOrdinal =  Integer.parseInt(conf.get("state.ordinal").toString());
+		 
+		 //detection algoritm
+		 String algorithm = conf.get("detection.algorithms").toString();
+		 if (algorithm.equals("missProbability")) {
+			 detectionAlgorithm = DetectionAlgorithm.MissProbability;
+		 } else if (algorithm.equals("missRate")) {
+			 detectionAlgorithm = DetectionAlgorithm.MissRate;
+		 } else if (algorithm.equals("entropyReduction")) {
+			 detectionAlgorithm = DetectionAlgorithm.EntropyReduction;
+		 } else {
+			 //error
+		 }
+		 
+		 //metric threshold
+		 metricThreshold =  Double.parseDouble(conf.get("metric.threshold").toString());
 	}
 
 	@Override
 	public double execute(String entityID, String record) {
-		List<String> recordPair = records.get(entityID);
-		if (null == recordPair) {
-			recordPair = new ArrayList<String>();
+		double score = 0;
+		
+		List<String> recordSeq = records.get(entityID);
+		if (null == recordSeq) {
+			recordSeq = new ArrayList<String>();
 		}
-		recordPair.add(record);
-		if (recordPair.size() > 2) {
-			recordPair.remove(0);
+		recordSeq.add(record);
+
+		if (recordSeq.size() > stateSeqWindowSize) {
+			records.remove(0);
 		}
 		
-		String state = null;
-		if (recordPair.size() == 2) {
-			//get state
-		}
+		if (localPredictor) {
+			//local metric
+			if (recordSeq.size() == stateSeqWindowSize) {
+				String[] stateSeq = new String[stateSeqWindowSize]; 
+				for (int i = 0; i < stateSeqWindowSize; ++i) {
+					stateSeq[i++] = recordSeq.get(i).split(",")[stateOrdinal];
+				}
+				score = getLocalMetric( stateSeq);
+			}
+		} else {
+			//global metric
+			if (recordSeq.size() >= 2) {
+				String[] stateSeq = new String[2];
+				for (int i = stateSeqWindowSize - 2, j =0; i < stateSeqWindowSize; ++i) {
+					stateSeq[j++] = recordSeq.get(i).split(",")[stateOrdinal];
+				}
+				Pair<Double,Double> params = globalParams.get(entityID);
+				if (null == params) {
+					params = new Pair<Double,Double>(0.0, 0.0);
+					globalParams.put(entityID, params);
+				}
+				score = getGlobalMetric( stateSeq, params);
+			}
+		}		
 		
-		//state sequence
-		List<String> stateSeq = stateSequences.get(entityID);
-		if (null == stateSeq) {
-			stateSeq = new ArrayList<String>();
+		//outlier
+		if (score > metricThreshold) {
+			
 		}
-		stateSeq.add(state);
-		if (stateSeq.size() > stateSeqWindowSize) {
-			stateSeq.remove(0);
-		}
-		
-		double score = getScore( stateSeq);
 		return score;
 	}
 	
+
 	/**
 	 * @param stateSeq
 	 * @return
 	 */
-	private double getScore(List<String> stateSeq) {
-		boolean first  = true;
-		int curIndex = 0, preIndex = 0;
-		double condPrDist = 0;
-		for (String state : stateSeq) {
-			if (first) {
-				curIndex = states.indexOf(state);
-				first = false;
-			} else {
-				preIndex = curIndex;
-				curIndex = states.indexOf(state);
-				condPrDist += Math.log(stateTranstionProb[preIndex][curIndex]);
+	private double getLocalMetric(String[] stateSeq) {
+		double metric = 0;
+		double paramF = 0;
+		double paramG = 0;
+		if (detectionAlgorithm == DetectionAlgorithm.MissProbability) {
+			for (int i = 1; i < stateSeq.length; ++i ){
+				int prState = states.indexOf(stateSeq[i -1]);
+				int cuState = states.indexOf(stateSeq[i ]);
+				
+				//add all probability except target state
+				for (int j = 0; j < states.size(); ++ j) {
+					if (j != cuState)
+					paramF += stateTranstionProb[prState][j];
+				}
+				paramG += 1;
 			}
+		} else if (detectionAlgorithm == DetectionAlgorithm.MissRate) {
+			
 		}
-		return condPrDist; 
-	}
+		
+		metric = paramF / paramG;	
+		return metric;
+		
+	}	
+	
 
+	/**
+	 * @param stateSeq
+	 * @return
+	 */
+	private double getGlobalMetric(String[] stateSeq, Pair<Double,Double> params) {
+		double metric = 0;
+		double paramF = 0;
+		double paramG = 0;
+		if (detectionAlgorithm == DetectionAlgorithm.MissProbability) {
+			for (int i = 1; i < stateSeq.length; ++i ){
+				int prState = states.indexOf(stateSeq[i -1]);
+				int cuState = states.indexOf(stateSeq[i ]);
+				for (int j = 0; j < states.size(); ++ j) {
+					if (j != cuState)
+					paramF += stateTranstionProb[prState][j];
+				}
+				paramG += 1;
+			}
+			params.setLeft(params.getLeft() + paramF);
+			params.setRight(params.getRight() + paramG);
+		} else if (detectionAlgorithm == DetectionAlgorithm.MissRate) {
+			
+		}
+		
+		metric = params.getLeft() / params.getRight();	
+		return metric;
+		
+	}	
+	
 }
