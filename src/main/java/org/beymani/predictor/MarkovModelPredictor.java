@@ -49,6 +49,9 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	private 	DetectionAlgorithm detectionAlgorithm;
 	private Map<String, Pair<Double, Double>> globalParams;
 	private double metricThreshold;
+	private int numStates;
+	private int[] maxStateProbIndex;
+	private double[] entropy;
 	
 	/**
 	 * @param conf
@@ -62,7 +65,6 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		
 		Scanner scanner = new Scanner(model);
 		int lineCount = 0;
-		int numStates = 0;
 		int row = 0;
 		while (scanner.hasNextLine()) {
 		  String line = scanner.nextLine();
@@ -96,8 +98,32 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			 detectionAlgorithm = DetectionAlgorithm.MissProbability;
 		 } else if (algorithm.equals("missRate")) {
 			 detectionAlgorithm = DetectionAlgorithm.MissRate;
+			 
+			 //max probability state index
+			 maxStateProbIndex = new int[numStates];
+			 for (int i = 0; i < numStates; ++i) {
+				 int maxProbIndex = -1;
+				 double maxProb = -1;
+				 for (int j = 0; j < numStates; ++j) {
+					 if (stateTranstionProb[i][j] > maxProb) {
+						 maxProb = stateTranstionProb[i][j];
+						 maxProbIndex = j;
+					 }
+				 }
+				 maxStateProbIndex[i] = maxProbIndex;
+			 }
 		 } else if (algorithm.equals("entropyReduction")) {
 			 detectionAlgorithm = DetectionAlgorithm.EntropyReduction;
+			 
+			 //entropy per source state
+			 entropy = new double[numStates];
+			 for (int i = 0; i < numStates; ++i) {
+				 double ent = 0;
+				 for (int j = 0; j < numStates; ++j) {
+					 ent  += -stateTranstionProb[i][j] * Math.log(stateTranstionProb[i][j]);
+				 }
+				 entropy[i] = ent;
+			 }
 		 } else {
 			 //error
 		 }
@@ -159,43 +185,17 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	 */
 	private double getLocalMetric(String[] stateSeq) {
 		double metric = 0;
-		double paramF = 0;
-		double paramG = 0;
+		double[] params = new double[2];
+		params[0] = params[1] = 0;
 		if (detectionAlgorithm == DetectionAlgorithm.MissProbability) {
-			for (int i = 1; i < stateSeq.length; ++i ){
-				int prState = states.indexOf(stateSeq[i -1]);
-				int cuState = states.indexOf(stateSeq[i ]);
-				
-				//add all probability except target state
-				for (int j = 0; j < states.size(); ++ j) {
-					if (j != cuState)
-					paramF += stateTranstionProb[prState][j];
-				}
-				paramG += 1;
-			}
+			missProbability(stateSeq, params);
 		} else if (detectionAlgorithm == DetectionAlgorithm.MissRate) {
-			for (int i = 1; i < stateSeq.length; ++i ){
-				int prState = states.indexOf(stateSeq[i -1]);
-				int cuState = states.indexOf(stateSeq[i ]);
-				
-				//if target is max prob state then 0 else 1
-				double maxProb = 0;
-				int maxprobStateIndex = - 1;
-				for (int j = 0; j < states.size(); ++ j) {
-					if ( stateTranstionProb[prState][j] > maxProb) {
-						maxProb = stateTranstionProb[prState][j];
-						maxprobStateIndex = i;
-					}
-				}
-				paramF += (cuState == maxprobStateIndex? 0 : 1);
-				paramG += 1;
-			}
-			
+			 missRate(stateSeq, params);
+		} else {
+			 entropyReduction( stateSeq, params);
 		}
-		
-		metric = paramF / paramG;	
+		metric = params[0] / params[1];	
 		return metric;
-		
 	}	
 	
 
@@ -203,44 +203,70 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	 * @param stateSeq
 	 * @return
 	 */
-	private double getGlobalMetric(String[] stateSeq, Pair<Double,Double> params) {
+	private double getGlobalMetric(String[] stateSeq, Pair<Double,Double> globParams) {
 		double metric = 0;
-		double paramF = 0;
-		double paramG = 0;
+		double[] params = new double[2];
+		params[0] = params[1] = 0;
 		if (detectionAlgorithm == DetectionAlgorithm.MissProbability) {
-			for (int i = 1; i < stateSeq.length; ++i ){
-				int prState = states.indexOf(stateSeq[i -1]);
-				int cuState = states.indexOf(stateSeq[i ]);
-				for (int j = 0; j < states.size(); ++ j) {
-					if (j != cuState)
-					paramF += stateTranstionProb[prState][j];
-				}
-				paramG += 1;
-			}
+			missProbability(stateSeq, params);
 		} else if (detectionAlgorithm == DetectionAlgorithm.MissRate) {
-			for (int i = 1; i < stateSeq.length; ++i ){
-				int prState = states.indexOf(stateSeq[i -1]);
-				int cuState = states.indexOf(stateSeq[i ]);
-				
-				//if target is max prob state then 0 else 1
-				double maxProb = 0;
-				int maxprobStateIndex = - 1;
-				for (int j = 0; j < states.size(); ++ j) {
-					if ( stateTranstionProb[prState][j] > maxProb) {
-						maxProb = stateTranstionProb[prState][j];
-						maxprobStateIndex = i;
-					}
-				}
-				paramF += (cuState == maxprobStateIndex? 0 : 1);
-				paramG += 1;
-			}
+			 missRate(stateSeq, params);
+		} else {
+			 entropyReduction( stateSeq, params);
 		}
-		params.setLeft(params.getLeft() + paramF);
-		params.setRight(params.getRight() + paramG);
 		
-		metric = params.getLeft() / params.getRight();	
+		globParams.setLeft(globParams.getLeft() + params[0]);
+		globParams.setRight(globParams.getRight() + params[1]);
+		metric = globParams.getLeft() / globParams.getRight();	
 		return metric;
-		
 	}	
+
+	/**
+	 * @param stateSeq
+	 * @return
+	 */
+	private void missProbability(String[] stateSeq, double[] params) {
+		int start = localPredictor? 1 :  stateSeq.length - 1;
+		for (int i = start; i < stateSeq.length; ++i ){
+			int prState = states.indexOf(stateSeq[i -1]);
+			int cuState = states.indexOf(stateSeq[i ]);
+			
+			//add all probability except target state
+			for (int j = 0; j < states.size(); ++ j) {
+				if (j != cuState)
+				params[0] += stateTranstionProb[prState][j];
+			}
+			params[1] += 1;
+		}
+	}
+	
+	
+	/**
+	 * @param stateSeq
+	 * @return
+	 */
+	private void missRate(String[] stateSeq, double[] params) {
+		int start = localPredictor? 1 :  stateSeq.length - 1;
+		for (int i = start; i < stateSeq.length; ++i ){
+			int prState = states.indexOf(stateSeq[i -1]);
+			int cuState = states.indexOf(stateSeq[i ]);
+			params[0] += (cuState == maxStateProbIndex[prState]? 0 : 1);
+			params[1] += 1;
+		}
+	}
+	
+	/**
+	 * @param stateSeq
+	 * @return
+	 */
+	private void entropyReduction(String[] stateSeq, double[] params) {
+		int start = localPredictor? 1 :  stateSeq.length - 1;
+		for (int i = start; i < stateSeq.length; ++i ){
+			int prState = states.indexOf(stateSeq[i -1]);
+			int cuState = states.indexOf(stateSeq[i ]);
+			params[0] += (cuState == maxStateProbIndex[prState]? 0 : 1);
+			params[1] += 1;
+		}
+	}
 	
 }
