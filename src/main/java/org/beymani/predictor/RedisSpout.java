@@ -54,7 +54,7 @@ public class RedisSpout  extends  BaseRichSpout {
 	@Override
 	public void nextTuple() {
 		String message  = jedis.rpop(messageQueue);		
-		if(!message.equals(NIL)) {
+		if(null != message  && !message.equals(NIL)) {
 			int pos = message.indexOf(",");
 			String entityID = message.substring(0, pos);
 			String recordData = message.substring(pos+1);

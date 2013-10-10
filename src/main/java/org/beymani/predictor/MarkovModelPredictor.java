@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Scanner;
 
 import org.chombo.util.Pair;
-import org.chombo.util.Utility;
 
 import redis.clients.jedis.Jedis;
 
@@ -52,6 +51,8 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	private int numStates;
 	private int[] maxStateProbIndex;
 	private double[] entropy;
+	private String outputQueue;
+	private Jedis jedis;
 	
 	/**
 	 * @param conf
@@ -59,10 +60,12 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	public MarkovModelPredictor(Map conf)   {
 		String redisHost = conf.get("redis.server.host").toString();
 		int redisPort = new Integer(conf.get("redis.server.port").toString());
-		Jedis jedis = new Jedis(redisHost, redisPort);
+		jedis = new Jedis(redisHost, redisPort);
+		outputQueue =  conf.get("redis.output.queue").toString();
+		
+		//model
 		String modelKey =  conf.get("redis.markov.model.key").toString();
 		String model = jedis.get(modelKey);
-		
 		Scanner scanner = new Scanner(model);
 		int lineCount = 0;
 		int row = 0;
@@ -76,12 +79,14 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			  stateTranstionProb = new double[numStates][numStates];
 		  } else {
 			  //populate state transtion probability
-		        Utility.deseralizeTableRow(stateTranstionProb, line, ",", row, numStates);
+		        deseralizeTableRow(stateTranstionProb, line, ",", row, numStates);
 		        ++row;
 		  }
 		  ++lineCount;
 		}
 		 scanner.close();
+		 
+		 
 		 localPredictor = Boolean.parseBoolean(conf.get("local.predictor").toString());
 		 if (localPredictor) {
 			 stateSeqWindowSize =  Integer.parseInt(conf.get("state.seq.window.size").toString());
@@ -93,7 +98,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		 stateOrdinal =  Integer.parseInt(conf.get("state.ordinal").toString());
 		 
 		 //detection algoritm
-		 String algorithm = conf.get("detection.algorithms").toString();
+		 String algorithm = conf.get("detection.algorithm").toString();
 		 if (algorithm.equals("missProbability")) {
 			 detectionAlgorithm = DetectionAlgorithm.MissProbability;
 		 } else if (algorithm.equals("missRate")) {
@@ -132,6 +137,24 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		 metricThreshold =  Double.parseDouble(conf.get("metric.threshold").toString());
 	}
 
+	/**
+	 * @param table
+	 * @param data
+	 * @param delim
+	 * @param row
+	 * @param numCol
+	 */
+	public  void deseralizeTableRow(double[][] table, String data, String delim, int row, int numCol) {
+		String[] items = data.split(delim);
+		if (items.length != numCol) {
+			throw new IllegalArgumentException(
+					"Row serialization failed, number of tokens in string does not match with number of columns");
+		}
+		for (int c = 0; c < numCol; ++c) {
+				table[row][c]  = Double.parseDouble(items[c]);
+		}
+	}
+	
 	@Override
 	public double execute(String entityID, String record) {
 		double score = 0;
@@ -173,7 +196,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		
 		//outlier
 		if (score > metricThreshold) {
-			
+			jedis.lpush(outputQueue, entityID + ":" + record);
 		}
 		return score;
 	}

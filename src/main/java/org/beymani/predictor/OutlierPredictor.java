@@ -70,6 +70,9 @@ public class OutlierPredictor {
 			double score = predictor.execute( entityID,  record);
 			
 			//write score to db
+			
+			//ack
+			collector.ack(input);
 		}
 
 		@Override
@@ -104,7 +107,7 @@ public class OutlierPredictor {
         //detector bolt
         int boltThreads = Integer.parseInt(configProps.getProperty("predictor.bolt.threads"));
         builder.setBolt("predictor", new PredictorBolt(), boltThreads)
-        	.fieldsGrouping("fileSpout", new Fields("entityID"));
+        	.fieldsGrouping("redisSpout", new Fields("entityID"));
        
         //submit topology
         int numWorkers = Integer.parseInt(configProps.getProperty("num.workers"));
