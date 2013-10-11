@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.chombo.util.Pair;
 
 import redis.clients.jedis.Jedis;
@@ -53,11 +55,18 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	private double[] entropy;
 	private String outputQueue;
 	private Jedis jedis;
+	private static final Logger LOG = Logger.getLogger(MarkovModelPredictor.class);
+	private boolean debugOn;
 	
 	/**
 	 * @param conf
 	 */
 	public MarkovModelPredictor(Map conf)   {
+		if (conf.get("debug").toString().equals("on")) {
+			LOG.setLevel(Level.DEBUG);;
+			debugOn = true;
+		}
+		
 		String redisHost = conf.get("redis.server.host").toString();
 		int redisPort = new Integer(conf.get("redis.server.port").toString());
 		jedis = new Jedis(redisHost, redisPort);
@@ -77,6 +86,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			  states = Arrays.asList(items);
 			  numStates = items.length;
 			  stateTranstionProb = new double[numStates][numStates];
+			  LOG.info("numStates:" + numStates);
 		  } else {
 			  //populate state transtion probability
 		        deseralizeTableRow(stateTranstionProb, line, ",", row, numStates);
@@ -85,11 +95,19 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		  ++lineCount;
 		}
 		 scanner.close();
-		 
+		 if (debugOn){
+			 for (int i = 0; i < numStates; ++i) {
+				 for (int j = 0; j < numStates; ++j) {
+					 LOG.info("state trans prob[" + i + "][" + j  +"]=" +  stateTranstionProb[i][j]);
+				 }
+			 }
+		 }
 		 
 		 localPredictor = Boolean.parseBoolean(conf.get("local.predictor").toString());
 		 if (localPredictor) {
 			 stateSeqWindowSize =  Integer.parseInt(conf.get("state.seq.window.size").toString());
+			 if (debugOn)
+				 LOG.info("local predictor window size:" + stateSeqWindowSize );
 		 }  else {
 			 stateSeqWindowSize = 5;
 			 globalParams = new HashMap<String, Pair<Double, Double>>();
@@ -99,6 +117,8 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		 
 		 //detection algoritm
 		 String algorithm = conf.get("detection.algorithm").toString();
+		 if (debugOn)
+			 LOG.info("detection algorithm:" + algorithm);
 		 if (algorithm.equals("missProbability")) {
 			 detectionAlgorithm = DetectionAlgorithm.MissProbability;
 		 } else if (algorithm.equals("missRate")) {
@@ -162,24 +182,30 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		List<String> recordSeq = records.get(entityID);
 		if (null == recordSeq) {
 			recordSeq = new ArrayList<String>();
+			records.put(entityID, recordSeq);
 		}
+		
+		//add and maintain size
 		recordSeq.add(record);
-
 		if (recordSeq.size() > stateSeqWindowSize) {
-			records.remove(0);
+			recordSeq.remove(0);
 		}
 		
 		if (localPredictor) {
 			//local metric
+			if (debugOn)
+				LOG.info("local metric,  seq size " + recordSeq.size());
 			if (recordSeq.size() == stateSeqWindowSize) {
 				String[] stateSeq = new String[stateSeqWindowSize]; 
 				for (int i = 0; i < stateSeqWindowSize; ++i) {
-					stateSeq[i++] = recordSeq.get(i).split(",")[stateOrdinal];
+					stateSeq[i] = recordSeq.get(i).split(",")[stateOrdinal];
 				}
 				score = getLocalMetric( stateSeq);
 			}
 		} else {
 			//global metric
+			if (debugOn)
+				LOG.info("global metric");
 			if (recordSeq.size() >= 2) {
 				String[] stateSeq = new String[2];
 				for (int i = stateSeqWindowSize - 2, j =0; i < stateSeqWindowSize; ++i) {
@@ -195,8 +221,11 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		}		
 		
 		//outlier
+		if (debugOn)
+			LOG.info("metric  " + entityID + ":" + score);
 		if (score > metricThreshold) {
-			jedis.lpush(outputQueue, entityID + ":" + record);
+			String msg = entityID + ":" + score;
+			jedis.lpush(outputQueue,  msg);
 		}
 		return score;
 	}
@@ -253,14 +282,18 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		for (int i = start; i < stateSeq.length; ++i ){
 			int prState = states.indexOf(stateSeq[i -1]);
 			int cuState = states.indexOf(stateSeq[i ]);
+			if (debugOn)
+				LOG.info("state prob index:" + prState + " " + cuState);
 			
 			//add all probability except target state
 			for (int j = 0; j < states.size(); ++ j) {
 				if (j != cuState)
-				params[0] += stateTranstionProb[prState][j];
+					params[0] += stateTranstionProb[prState][j];
 			}
 			params[1] += 1;
 		}
+		if (debugOn)
+			LOG.info("params:" + params[0] + ":" + params[1]);
 	}
 	
 	
