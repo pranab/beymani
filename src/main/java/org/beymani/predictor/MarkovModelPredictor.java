@@ -191,12 +191,13 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			recordSeq.remove(0);
 		}
 		
+		String[] stateSeq = null;
 		if (localPredictor) {
 			//local metric
 			if (debugOn)
 				LOG.info("local metric,  seq size " + recordSeq.size());
 			if (recordSeq.size() == stateSeqWindowSize) {
-				String[] stateSeq = new String[stateSeqWindowSize]; 
+				stateSeq = new String[stateSeqWindowSize]; 
 				for (int i = 0; i < stateSeqWindowSize; ++i) {
 					stateSeq[i] = recordSeq.get(i).split(",")[stateOrdinal];
 				}
@@ -207,7 +208,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			if (debugOn)
 				LOG.info("global metric");
 			if (recordSeq.size() >= 2) {
-				String[] stateSeq = new String[2];
+				stateSeq = new String[2];
 				for (int i = stateSeqWindowSize - 2, j =0; i < stateSeqWindowSize; ++i) {
 					stateSeq[j++] = recordSeq.get(i).split(",")[stateOrdinal];
 				}
@@ -224,8 +225,14 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		if (debugOn)
 			LOG.info("metric  " + entityID + ":" + score);
 		if (score > metricThreshold) {
-			String msg = entityID + ":" + score;
-			jedis.lpush(outputQueue,  msg);
+			StringBuilder stBld = new StringBuilder(entityID);
+			stBld.append(" : ");
+			for (String st : stateSeq) {
+				stBld.append(st).append(" ");
+			}
+			stBld.append(": ");
+			stBld.append(score);
+			jedis.lpush(outputQueue,  stBld.toString());
 		}
 		return score;
 	}
