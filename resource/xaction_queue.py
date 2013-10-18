@@ -28,6 +28,16 @@ elif (op == "readQueue"):
 			print line
 		else:
 			break
+elif (op == "queueLength"):
+	qlen = r.llen("xactionQueue")
+	print qlen
 elif (op == "readOutQueue"):
-	out = r.get("fraudQueue")
-	print out
+	while True:
+		out = r.rpop("fraudQueue")
+		if out is not None:
+			print out
+		else:
+			break
+elif (op == "outQueueLength"):
+	qlen = r.llen("fraudQueue")
+	print qlen
