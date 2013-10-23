@@ -1,0 +1,14 @@
+
+<project name="beymani_for_storm" default="uber-jar" basedir=".">
+<target name="uber-jar">
+    <echo>Packaging into a single uber JAR</echo>
+	<jar destfile="uber-beymani-1.0.jar">
+		<zipgroupfileset dir="/home/pranab/Projects/lib" includes="jedis-2.1.0.jar,commons-pool-1.5.5.jar" /> 
+		<zipgroupfileset dir="/home/pranab/Projects/beymani/target" includes="beymani-1.0.jar, " /> 
+		<zipgroupfileset dir="/home/pranab/Projects/chombo/target" includes="chombo-1.0.jar, " /> 
+		<manifest>
+			<attribute name="Main-Class" value=" org.beymani.predictor.OutlierPredictor" />
+		</manifest>
+	</jar>
+</target>
+</project>
