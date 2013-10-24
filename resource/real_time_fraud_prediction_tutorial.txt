@@ -1,8 +1,9 @@
 This tutorial is for real time fraud detection using Haddop Storm. It uses markov chanin
 as the predictive model. Make necessary changes to path etc to suit your environment.
 
-Create training transactiondata
-===============================
+Create training transaction data
+================================
+Get util.rb from the project visitante. Puta copy of the file in ../lib
 ./xaction_states.rb 5000 > xact_training.txt
 
 where 5000 is the number of customers
@@ -99,7 +100,7 @@ debug=on
 redis.server.host=localhost
 redis.server.port=6379
 redis.markov.model.key=xactionMarkovModel
-redis.message.queue=xactionQueue
+redis.input.queue=xactionQueue
 local.predictor=true
 state.seq.window.size=5
 state.ordinal=1

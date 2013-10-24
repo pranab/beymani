@@ -48,7 +48,7 @@ public class RedisSpout  extends  BaseRichSpout {
 		String redisHost = conf.get("redis.server.host").toString();
 		int redisPort = new Integer(conf.get("redis.server.port").toString());
 		jedis = new Jedis(redisHost, redisPort);
-		messageQueue =  conf.get("redis.message.queue").toString();
+		messageQueue =  conf.get("redis.input.queue").toString();
 	}
 
 	@Override
