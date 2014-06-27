@@ -59,7 +59,7 @@ Write test data to Redis queue
 
 Build uber jar for storm deployment
 ===================================
-ant build_storm.xml
+ant -f build_storm.xml
 
 Deploy storm topology
 =====================
