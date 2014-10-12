@@ -1,8 +1,15 @@
 This tutorial is for real time fraud detection using Haddop Storm. It uses markov chanin
 as the predictive model. Make necessary changes to path etc to suit your environment.
 
-Create training transaction data
-================================
+Dependency
+==========
+The project has dependency on chombo.Please do the build as below for chombo and avenir respectively
+mvn clean  install
+
+Please refer to jar_dependency.txt for details of dependency
+
+Generate input data
+===================
 Get util.rb from the project visitante. Puta copy of the file in ../lib
 ./xaction_states.rb 5000 > xact_training.txt
 
@@ -11,7 +18,7 @@ Copy the output file to HDFS input directory /Users/pranab/mmfr/input
 
 Generate transaction sequence data with MR
 ==========================================
-Run this script
+Run this script. This MR belogs to the project chombo
 
 JAR_NAME=/home/pranab/Projects/chombo/target/chombo-1.0.jar
 CLASS_NAME=org.chombo.mr.Projection

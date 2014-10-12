@@ -1,0 +1,54 @@
+Dependent jars
+==============
+beymani depends on the following jar libraries. Most of them are third party except for
+chombo. For these two you could either checkout the jars and place them in your
+local maven repo or you could build them.
+
+jackson-core-lgpl-1.6.3.jar 
+jackson-mapper-lgpl-1.6.3.jar 
+chombo-1.0.jar 
+commons-lang-3.1.jar
+
+
+Building dependent jars
+=======================
+Follow these steps if you have decided to build the jars for chombo and hoidla
+
+Checkout project chombo and run
+mvn clean install
+
+
+Handling dependency
+===================
+There are many ways to handle dependency in Hadoop
+
+1. Use libjar command line options as below
+hadoop jar xyz.jar com.example.MyMapreduce -libjars path1/lib1.jar,path2/lib2.jar
+
+2. Use maven shade plugin to package all jars into one uber jar. The following needs to
+be added to the build element in pom.xml
+<build>
+.......
+	<plugins>
+		<plugin>
+			<groupId>org.apache.maven.plugins</groupId>
+			<artifactId>maven-shade-plugin</artifactId>
+			<executions>
+				<execution>
+					<phase>package</phase>
+					<goals>
+						<goal>shade</goal>
+					</goals>
+				</execution>
+			</executions>
+			<configuration>
+				<finalName>uber-${artifactId}-${version}</finalName>
+			</configuration>
+		</plugin>
+	</plugins>
+.......
+</build>
+
+3. Use ant to package all dependent jars. You could use ../resource/build_hadoop.xml as an example
+
+4. Copy all jars to hadoop lib directory in all nodes 
