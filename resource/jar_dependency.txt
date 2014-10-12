@@ -8,6 +8,7 @@ jackson-core-lgpl-1.6.3.jar
 jackson-mapper-lgpl-1.6.3.jar 
 chombo-1.0.jar 
 commons-lang-3.1.jar
+jedis-2.2.1.jar
 
 
 Building dependent jars
