@@ -47,7 +47,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		MissRate, 
 		EntropyReduction
 	};
-	private 	DetectionAlgorithm detectionAlgorithm;
+	private DetectionAlgorithm detectionAlgorithm;
 	private Map<String, Pair<Double, Double>> globalParams;
 	private double metricThreshold;
 	private int numStates;
@@ -324,12 +324,30 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	 */
 	private void entropyReduction(String[] stateSeq, double[] params) {
 		int start = localPredictor? 1 :  stateSeq.length - 1;
+		double entropyWoTragetState = 0;
+		double entropy = 0;
+		
 		for (int i = start; i < stateSeq.length; ++i ){
 			int prState = states.indexOf(stateSeq[i -1]);
 			int cuState = states.indexOf(stateSeq[i ]);
-			params[0] += (cuState == maxStateProbIndex[prState]? 0 : 1);
-			params[1] += 1;
+			if (debugOn)
+				LOG.info("state prob index:" + prState + " " + cuState);
+
+			for (int j = 0; j < states.size(); ++ j) {
+				double pr = stateTranstionProb[prState][j];
+				double enComp = -pr * Math.log(pr);
+				
+				//entropy without target state
+				if (j != cuState) {
+					entropyWoTragetState += enComp;
+				}
+				
+				//full entropy
+				entropy += enComp;
+			}
 		}
+		params[0] = entropyWoTragetState / entropy;
+		params[1] = 1;
 	}
 	
 }
