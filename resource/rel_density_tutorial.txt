@@ -19,8 +19,11 @@ density.file.prefix=den
 
 Map Reduce Jobs
 ===============
+1. Similarity calculation
+run SameTypeSimilarity
 
-1. Density calculation. Here is a sample script. It uses the output of SameTypeSmilarity MR as input
+2. Density calculation. 
+Here is a sample script. It uses the output of SameTypeSmilarity MR as input
 
 JAR_NAME=/home/pranab/Projects/beymani/target/beymani-1.0.jar
 CLASS_NAME=org.beymani.proximity.AverageDistance
@@ -40,7 +43,8 @@ top.match.average=false
 top.match.density=true
 top.match.grouping=false
 
-2. Use the same MR as before to calculate neighborhood groups.
+3. Calculate neighborhood groups
+Use the same MR as before. Watch the configurations params at the end of this section
 
 JAR_NAME=/home/pranab/Projects/beymani/target/beymani-1.0.jar
 CLASS_NAME=org.beymani.proximity.AverageDistance
@@ -60,8 +64,10 @@ top.match.average=false
 top.match.density=flase
 top.match.grouping=true
 
-3. Find Neighborhood and Density. Here is a sample  script. Before running make sure out of the last 2 MR is copied
-or moved to the input dir for thios MR
+4. Find Neighborhood and Density. 
+Here is a sample  script. Before running make sure out of step 2 and 3  is copied
+or moved to the input dir for thios MR. Change the prefix of the output of step 2 
+to what is defined in the config param density.file.prefix
 
 JAR_NAME=/home/pranab/Projects/beymani/target/beymani-1.0.jar
 CLASS_NAME=org.beymani.proximity.NeighborDensity
@@ -75,7 +81,8 @@ echo "removed output dir"
 
 hadoop jar $JAR_NAME  $CLASS_NAME -Dconf.path=/home/pranab/Projects/bin/fraud/cct.properties  $IN_PATH  $OUT_PATH
 
-4. This the final MR to find relative density. It ises the input of step 3 as input. Here is the sample script
+5. Relative density calculation
+It uses the input of step 4 as input. Here is the sample script
 
 JAR_NAME=/home/pranab/Projects/beymani/target/beymani-1.0.jar
 CLASS_NAME=org.beymani.proximity.RelativeDensity
