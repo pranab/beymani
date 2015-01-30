@@ -8,6 +8,9 @@ mvn clean  install
 
 Please refer to jar_dependency.txt for details of dependency
 
+Easiest way is to use ant as follows
+ant build_storm.xml
+
 Generate input data
 ===================
 Get util.rb from the project visitante. Puta copy of the file in ../lib
