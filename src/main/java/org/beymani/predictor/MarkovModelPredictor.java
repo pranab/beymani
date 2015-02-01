@@ -26,6 +26,8 @@ import java.util.Scanner;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.chombo.storm.Cache;
+import org.chombo.storm.MessageQueue;
 import org.chombo.util.Pair;
 
 import redis.clients.jedis.Jedis;
@@ -54,7 +56,8 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	private int[] maxStateProbIndex;
 	private double[] entropy;
 	private String outputQueue;
-	private Jedis jedis;
+	private MessageQueue outQueue;
+	private Cache cache;
 	private static final Logger LOG = Logger.getLogger(MarkovModelPredictor.class);
 	private boolean debugOn;
 	
@@ -67,14 +70,13 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			debugOn = true;
 		}
 		
-		String redisHost = conf.get("redis.server.host").toString();
-		int redisPort = new Integer(conf.get("redis.server.port").toString());
-		jedis = new Jedis(redisHost, redisPort);
 		outputQueue =  conf.get("redis.output.queue").toString();
+		outQueue = MessageQueue.createMessageQueue(conf, outputQueue);
+		cache = Cache.createCache(conf);
 		
 		//model
 		String modelKey =  conf.get("redis.markov.model.key").toString();
-		String model = jedis.get(modelKey);
+		String model = cache.get(modelKey);
 		Scanner scanner = new Scanner(model);
 		int lineCount = 0;
 		int row = 0;
@@ -232,7 +234,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			}
 			stBld.append(": ");
 			stBld.append(score);
-			jedis.lpush(outputQueue,  stBld.toString());
+			outQueue.send(stBld.toString());
 		}
 		return score;
 	}

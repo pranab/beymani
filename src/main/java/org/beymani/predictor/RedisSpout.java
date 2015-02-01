@@ -20,7 +20,7 @@ package org.beymani.predictor;
 
 import java.util.Map;
 
-import redis.clients.jedis.Jedis;
+import org.chombo.storm.MessageQueue;
 
 import backtype.storm.spout.SpoutOutputCollector;
 import backtype.storm.task.TopologyContext;
@@ -36,8 +36,8 @@ import backtype.storm.tuple.Values;
 public class RedisSpout  extends  BaseRichSpout {
     private SpoutOutputCollector collector;
     private Map conf;
-	private Jedis jedis;
 	private String messageQueue;
+	private MessageQueue msgQueue;
 	private static final String NIL = "nil";
 
 	@Override
@@ -45,15 +45,13 @@ public class RedisSpout  extends  BaseRichSpout {
 			SpoutOutputCollector collector) {
 		this.collector = collector;
 		this.conf = conf;
-		String redisHost = conf.get("redis.server.host").toString();
-		int redisPort = new Integer(conf.get("redis.server.port").toString());
-		jedis = new Jedis(redisHost, redisPort);
 		messageQueue =  conf.get("redis.input.queue").toString();
+		msgQueue = MessageQueue.createMessageQueue(conf, messageQueue);
 	}
 
 	@Override
 	public void nextTuple() {
-		String message  = jedis.rpop(messageQueue);		
+		String message  = msgQueue.receive();
 		if(null != message  && !message.equals(NIL)) {
 			int pos = message.indexOf(",");
 			String entityID = message.substring(0, pos);
