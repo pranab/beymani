@@ -99,12 +99,12 @@ public class OutlierPredictor {
         //spout
         TopologyBuilder builder = new TopologyBuilder();
         int spoutThreads = Integer.parseInt(configProps.getProperty("predictor.spout.threads"));
-        builder.setSpout("redisSpout", new RedisSpout(), spoutThreads);
+        builder.setSpout("predictorSpout", new PredictorSpout(), spoutThreads);
         
         //detector bolt
         int boltThreads = Integer.parseInt(configProps.getProperty("predictor.bolt.threads"));
         builder.setBolt("predictor", new PredictorBolt(), boltThreads)
-        	.fieldsGrouping("redisSpout", new Fields("entityID"));
+        	.fieldsGrouping("predictorSpout", new Fields("entityID"));
        
         //submit topology
         int numWorkers = Integer.parseInt(configProps.getProperty("num.workers"));

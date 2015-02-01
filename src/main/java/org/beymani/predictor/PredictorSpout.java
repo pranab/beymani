@@ -33,7 +33,7 @@ import backtype.storm.tuple.Values;
  * @author pranab
  *
  */
-public class RedisSpout  extends  BaseRichSpout {
+public class PredictorSpout  extends  BaseRichSpout {
     private SpoutOutputCollector collector;
     private Map conf;
 	private String messageQueue;
