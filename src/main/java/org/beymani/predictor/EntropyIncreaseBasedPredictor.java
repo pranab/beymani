@@ -40,7 +40,7 @@ public class EntropyIncreaseBasedPredictor extends DistributionBasedPredictor {
 	private double baseConvConst = Math.log(2);
 	private String subFieldDelim = ":";
 	
-	public EntropyIncreaseBasedPredictor(Map conf) throws JsonParseException, JsonMappingException, IOException {
+	public EntropyIncreaseBasedPredictor(Map conf) {
 		super(conf);
 		
 		//entropy

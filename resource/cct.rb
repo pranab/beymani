@@ -185,6 +185,7 @@ end
 1.upto count do 
 	id = gen_id(key)
 	time = sample(time_dist, 60, 2, 8)
+	time = time > 1440 ? 1440 : time
 	v = vendor_dist[rand(vendor_dist.length)]
 	vendor = vendors[v]
 	am = sample(vendor_amount_dist[vendor], 100, 4, 12)
