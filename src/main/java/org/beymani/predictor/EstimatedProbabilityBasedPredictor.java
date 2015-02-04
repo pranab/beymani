@@ -19,6 +19,11 @@ package org.beymani.predictor;
 
 import java.util.Map;
 
+/**
+ * Estimated probability based outlier prediction
+ * @author pranab
+ *
+ */
 public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredictor {
 
 	public EstimatedProbabilityBasedPredictor(Map conf) {
@@ -30,7 +35,12 @@ public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredict
 		String bucketKey = getBucketKey(record);
 		Integer count = distrModel.get(bucketKey);
 		double pr = null != count ? (((double)count) / totalCount) : 0;
-		return 1.0 - pr;
+		double score = 1.0 - pr;
+		if (score > scoreThreshold) {
+			//write if above threshold
+			outQueue.send(entityID + " " + score);
+		}
+		return score;
 	}
 
 }
