@@ -43,6 +43,10 @@ import org.chombo.util.Tuple;
 import org.chombo.util.Utility;
 import org.codehaus.jackson.map.ObjectMapper;
 
+/**
+ * @author pranab
+ *
+ */
 public class DistributionSorter extends Configured implements Tool {
 
 	@Override
@@ -66,12 +70,18 @@ public class DistributionSorter extends Configured implements Tool {
         job.setOutputValueClass(Text.class);
 
         Utility.setConfiguration(job.getConfiguration());
-        job.setNumReduceTasks(job.getConfiguration().getInt("num.reducer", 1));
+        int numReducer = job.getConfiguration().getInt("dis.num.reducer", -1);
+        numReducer = -1 == numReducer ? job.getConfiguration().getInt("num.reducer", 1) : numReducer;
+        job.setNumReduceTasks(numReducer);
         
         int status =  job.waitForCompletion(true) ? 0 : 1;
         return status;
 	}
 	
+	/**
+	 * @author pranab
+	 *
+	 */
 	public static class SorterMapper extends Mapper<LongWritable, Text, Tuple , Text> {
 		private Tuple outKey = new Tuple();
 		private Text outVal = new Text();
@@ -133,14 +143,34 @@ public class DistributionSorter extends Configured implements Tool {
        }
 	}
 
+    /**
+     * @author pranab
+     *
+     */
     public static class SorterReducer extends Reducer<Tuple, Text, NullWritable, Text> {
-        
+    	private int itemCount;
+    	private int maxItemCount;
+    	private String itemDelim;
+    	boolean filtered;
+    	
+    	protected void setup(Context context) throws IOException, InterruptedException {
+ 			Configuration conf = context.getConfiguration();
+ 			maxItemCount = conf.getInt("max.item.count", -1);
+ 			itemCount = 0;
+        	itemDelim = conf.get("item.delim", ",");
+        	filtered = maxItemCount > 0;
+         }    	
+       
     	protected void reduce(Tuple key, Iterable<Text> values, Context context)
         	throws IOException, InterruptedException {
-        	for (Text value : values){
-    			context.write(NullWritable.get(), value);
-    			break;
-        	}    	
+    		if (!filtered || itemCount < maxItemCount ) {
+	        	for (Text value : values){
+	    			context.write(NullWritable.get(), value);
+	    			if (filtered) {
+	    				itemCount += value.toString().split(itemDelim).length;
+	    			}
+	        	}   
+    		}
     	}
     }
  

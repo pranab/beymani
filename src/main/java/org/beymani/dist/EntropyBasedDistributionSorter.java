@@ -34,41 +34,41 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.chombo.mr.HistogramField;
 import org.chombo.mr.HistogramSchema;
 import org.chombo.util.Tuple;
 import org.chombo.util.Utility;
 import org.codehaus.jackson.map.ObjectMapper;
 
 /**
- * Multivariate distribution
+ * Sorts multivariate distr by the ascending order of entropy contribution for a bucket
  * @author pranab
  *
  */
-public  class MultiVariateDistribution extends Configured implements Tool {
+public class EntropyBasedDistributionSorter extends Configured implements Tool {
 
 	@Override
 	public int run(String[] args) throws Exception {
         Job job = new Job(getConf());
-        String jobName = "Muti variate distribution  MR";
+        String jobName = "Entropy based muti variate distribution sorter  MR";
         job.setJobName(jobName);
         
-        job.setJarByClass(MultiVariateDistribution.class);
+        job.setJarByClass(EntropyBasedDistributionSorter.class);
         
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
         
-        job.setMapperClass(MultiVariateDistribution.HistogramMapper.class);
-        job.setReducerClass(MultiVariateDistribution.HistogramReducer.class);
+        job.setMapperClass(EntropyBasedDistributionSorter.SorterMapper.class);
+        job.setReducerClass(EntropyBasedDistributionSorter.SorterReducer.class);
         
         job.setMapOutputKeyClass(Tuple.class);
-        job.setMapOutputValueClass(Text.class);
+        job.setMapOutputValueClass(Tuple.class);
 
         job.setOutputKeyClass(NullWritable.class);
         job.setOutputValueClass(Text.class);
 
         Utility.setConfiguration(job.getConfiguration());
-        int numReducer = job.getConfiguration().getInt("mvd.num.reducer", -1);
+        
+        int numReducer = job.getConfiguration().getInt("ebd.num.reducer", -1);
         numReducer = -1 == numReducer ? job.getConfiguration().getInt("num.reducer", 1) : numReducer;
         job.setNumReduceTasks(numReducer);
         
@@ -76,14 +76,22 @@ public  class MultiVariateDistribution extends Configured implements Tool {
         return status;
 	}
 
-	public static class HistogramMapper extends Mapper<LongWritable, Text, Tuple , Text> {
+	/**
+	 * @author pranab
+	 *
+	 */
+	public static class SorterMapper extends Mapper<LongWritable, Text, Tuple , Tuple> {
 		private Tuple outKey = new Tuple();
-		private Text outVal = new Text();
+		private Tuple outVal = new Tuple();
         private String fieldDelimRegex;
         private HistogramSchema schema;
-        private String keyCompSt;
-        private Integer keyCompInt;
-        private int numFields;
+        private String  bucketValues;
+        private String itemDelim;
+        private Integer valueCount;
+        private int totalItemCount;
+        private double prob;
+        private double entropy;
+        
         
         protected void setup(Context context) throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
@@ -95,66 +103,72 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             FSDataInputStream fs = dfs.open(src);
             ObjectMapper mapper = new ObjectMapper();
             schema = mapper.readValue(fs, HistogramSchema.class);
-            
-            numFields = schema.getFields().size();
+        	itemDelim = conf.get("item.delim", ",");
+        	totalItemCount = conf.getInt("total.Item.count", -1);
+        	if (totalItemCount == -1) {
+        		throw new  IllegalStateException("max item count should be provided");
+        	}
        }
 
         @Override
         protected void map(LongWritable key, Text value, Context context)
             throws IOException, InterruptedException {
             String[] items  =  value.toString().split(fieldDelimRegex);
-            if ( items.length  != numFields){
+            if ( items.length  != 2){
             	context.getCounter("Data", "Invalid").increment(1);
             	return;
             }
+            bucketValues = items[1];
+            valueCount = bucketValues.split(itemDelim).length;
+            prob = (double)valueCount / totalItemCount;
+            entropy = - prob * Math.log(prob);
             
             outKey.initialize();
-            for (HistogramField field : schema.getFields()) {
-            	String	item = items[field.getOrdinal()];
-            	if (field.isCategorical()){
-            		keyCompSt = item;
-            		outKey.add(keyCompSt);
-            	} else if (field.isInteger()) {
-            		 keyCompInt = Integer.parseInt(item) /  field.getBucketWidth();
-            		outKey.add(keyCompInt);
-            	} else if (field.isDouble()) {
-            		 keyCompInt = ((int)Double.parseDouble(item)) /  field.getBucketWidth();
-            		outKey.add(keyCompInt);
-            	} else if (field.isId()) {
-            		outVal.set(item);
-            	}
-            }
-        	context.getCounter("Data", "Processed record").increment(1);
+            outVal.initialize();
+            outKey.add(1.0 / entropy);
+            outVal.add(entropy, bucketValues);
 			context.write(outKey, outVal);
        }
 	}
 	
-    public static class HistogramReducer extends Reducer<Tuple, Text, NullWritable, Text> {
-    	private Text valueOut = new Text();
+    /**
+     * @author pranab
+     *
+     */
+    public static class SorterReducer extends Reducer<Tuple, Tuple, NullWritable, Text> {
+    	private int itemCount;
     	private String fieldDelim ;
-        private String itemDelim;
-        
-        protected void setup(Context context) throws IOException, InterruptedException {
-			Configuration conf = context.getConfiguration();
+    	private int maxItemCount;
+    	private String itemDelim;
+    	boolean filtered;
+    	private Text outVal = new Text();
+    	private boolean outputEntropy;
+    	
+    	protected void setup(Context context) throws IOException, InterruptedException {
+ 			Configuration conf = context.getConfiguration();
         	fieldDelim = conf.get("field.delim", "[]");
+ 			maxItemCount = conf.getInt("max.item.count", -1);
+ 			itemCount = 0;
         	itemDelim = conf.get("item.delim", ",");
-        }    	
-        
+        	filtered = maxItemCount > 0;
+        	outputEntropy = conf.getBoolean("output.entropy", false);
+         }    	
+       
     	protected void reduce(Tuple key, Iterable<Text> values, Context context)
         	throws IOException, InterruptedException {
-   		    StringBuilder stBld = new  StringBuilder();
-   		    boolean first = true;
-        	for (Text value : values){
-        		if (first) {
-        			stBld.append(value.toString());
-        			first = false;
-        		} else {
-        			stBld.append(itemDelim).append(value.toString());
-        		}
-        	}    	
-        	key.setDelim(itemDelim);
-        	valueOut.set(key.toString() + fieldDelim + stBld.toString());
-			context.write(NullWritable.get(), valueOut);
+    		if (!filtered || itemCount < maxItemCount ) {
+	        	for (Text value : values){
+	        		if (outputEntropy) {
+	        			outVal.set("" + key.getDouble(0) + fieldDelim + value.toString());
+		    			context.write(NullWritable.get(), outVal);
+	        		} else {
+	        			context.write(NullWritable.get(), value);
+	        		}
+	    			if (filtered) {
+	    				itemCount += value.toString().split(itemDelim).length;
+	    			}
+	        	}   
+    		}
     	}
     }
  
@@ -162,7 +176,8 @@ public  class MultiVariateDistribution extends Configured implements Tool {
 	 * @param args
 	 */
 	public static void main(String[] args) throws Exception {
-        int exitCode = ToolRunner.run(new MultiVariateDistribution(), args);
+        int exitCode = ToolRunner.run(new EntropyBasedDistributionSorter(), args);
         System.exit(exitCode);
 	}
+
 }
