@@ -27,15 +27,21 @@ import java.util.List;
  *
  * @param <T>
  */
-public class Sequence<T> {
+public class SequenceMatcher<T> {
 	private List<T> seqData = new ArrayList<T>();
 	private int maxSize;
-	private int sim;
+	private double sim;
+	private boolean normalize;
+	private boolean similarity;
+	private int matchSize;
 
-	public Sequence() {
+	public SequenceMatcher(boolean normalize, boolean similarity) {
+		this.normalize = normalize;
+		this.similarity = similarity;
 	}
 	
-	public Sequence(int maxSize) {
+	public SequenceMatcher(int maxSize,boolean normalized, boolean similarity) {
+		this(normalized, similarity);
 		this.maxSize = maxSize;
 	}
 	
@@ -51,14 +57,15 @@ public class Sequence<T> {
 	 * @param other
 	 * @return
 	 */
-	public int matchCount(Sequence<T> other) {
-		int matchSize = seqData.size() < other.seqData.size() ? seqData.size() : other.seqData.size();
+	public double matchCount(SequenceMatcher<T> other) {
+		matchSize = seqData.size() < other.seqData.size() ? seqData.size() : other.seqData.size();
 		sim = 0;
 		for (int i = 0; i < matchSize; ++i) {
 			if (seqData.get(i).equals(other.seqData.get(i))) {
 				++sim;
 			}
 		}
+		prepeareResult(matchSize);
 		return sim;
 	}
 	
@@ -67,8 +74,8 @@ public class Sequence<T> {
 	 * @param other
 	 * @return
 	 */
-	public int adjacencyRewardedMatchCount(Sequence<T> other) {
-		int matchSize = seqData.size() < other.seqData.size() ? seqData.size() : other.seqData.size();
+	public double adjacencyRewardedMatchCount(SequenceMatcher<T> other) {
+		matchSize = seqData.size() < other.seqData.size() ? seqData.size() : other.seqData.size();
 		sim = 0;
 		int adjCount = 1;
 		for (int i = 0; i < matchSize; ++i) {
@@ -79,6 +86,7 @@ public class Sequence<T> {
 				adjCount = 1;
 			}
 		}		
+		prepeareResult(matchSize);
 		return sim;
 	}	
 	
@@ -87,7 +95,7 @@ public class Sequence<T> {
 	 * @param other
 	 * @return
 	 */
-	public int maxCommonSubSeqMatchCount(Sequence<T> other) {
+	public double maxCommonSubSeqMatchCount(SequenceMatcher<T> other) {
 		int matchSize = seqData.size() < other.seqData.size() ? seqData.size() : other.seqData.size();
 		sim = 0;
 		int adjCount = 0;
@@ -101,7 +109,24 @@ public class Sequence<T> {
 				adjCount = 0;
 			}
 		}		
+		prepeareResult(matchSize * (matchSize + 1) / 2);
 		return sim;
 	}	
+	
+	/**
+	 * @param scale
+	 */
+	private void prepeareResult(int scale) {
+		if (normalize) {
+			sim /= scale;
+			if (!similarity) {
+				sim = 1.0 - sim;
+			}
+		} else {
+			if (!similarity) {
+				sim = scale - sim;
+			}
+		}
+	}
 	
 }
