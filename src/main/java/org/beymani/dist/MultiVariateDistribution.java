@@ -84,6 +84,7 @@ public  class MultiVariateDistribution extends Configured implements Tool {
         private String keyCompSt;
         private Integer keyCompInt;
         private int numFields;
+        private HistogramField partitionField;
         
         protected void setup(Context context) throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
@@ -97,6 +98,7 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             schema = mapper.readValue(fs, HistogramSchema.class);
             
             numFields = schema.getFields().size();
+            partitionField = schema.getPartitionField();
        }
 
         @Override
@@ -109,16 +111,20 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             }
             
             outKey.initialize();
+            if(null != partitionField) {
+            	outKey.add(items[partitionField.getOrdinal()]);
+            }
+            
             for (HistogramField field : schema.getFields()) {
             	String	item = items[field.getOrdinal()];
             	if (field.isCategorical()){
             		keyCompSt = item;
             		outKey.add(keyCompSt);
             	} else if (field.isInteger()) {
-            		 keyCompInt = Integer.parseInt(item) /  field.getBucketWidth();
+            		keyCompInt = Integer.parseInt(item) /  field.getBucketWidth();
             		outKey.add(keyCompInt);
             	} else if (field.isDouble()) {
-            		 keyCompInt = ((int)Double.parseDouble(item)) /  field.getBucketWidth();
+            		keyCompInt = ((int)Double.parseDouble(item)) /  field.getBucketWidth();
             		outKey.add(keyCompInt);
             	} else if (field.isId()) {
             		outVal.set(item);
@@ -129,11 +135,18 @@ public  class MultiVariateDistribution extends Configured implements Tool {
        }
 	}
 	
+    /**
+     * @author pranab
+     *
+     */
     public static class HistogramReducer extends Reducer<Tuple, Text, NullWritable, Text> {
     	private Text valueOut = new Text();
     	private String fieldDelim ;
         private String itemDelim;
         
+        /* (non-Javadoc)
+         * @see org.apache.hadoop.mapreduce.Reducer#setup(org.apache.hadoop.mapreduce.Reducer.Context)
+         */
         protected void setup(Context context) throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
         	fieldDelim = conf.get("field.delim", "[]");
