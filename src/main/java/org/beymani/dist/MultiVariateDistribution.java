@@ -143,6 +143,8 @@ public  class MultiVariateDistribution extends Configured implements Tool {
     	private Text valueOut = new Text();
     	private String fieldDelim ;
         private String itemDelim;
+        private boolean outputCount;
+        private int count;
         
         /* (non-Javadoc)
          * @see org.apache.hadoop.mapreduce.Reducer#setup(org.apache.hadoop.mapreduce.Reducer.Context)
@@ -151,22 +153,33 @@ public  class MultiVariateDistribution extends Configured implements Tool {
 			Configuration conf = context.getConfiguration();
         	fieldDelim = conf.get("field.delim", "[]");
         	itemDelim = conf.get("item.delim", ",");
+        	outputCount = conf.getBoolean("output.count", false);
         }    	
         
     	protected void reduce(Tuple key, Iterable<Text> values, Context context)
         	throws IOException, InterruptedException {
    		    StringBuilder stBld = new  StringBuilder();
    		    boolean first = true;
+   		    count = 0;
         	for (Text value : values){
-        		if (first) {
-        			stBld.append(value.toString());
-        			first = false;
+        		if (outputCount) {
+        			++count;
         		} else {
-        			stBld.append(itemDelim).append(value.toString());
+	        		if (first) {
+	        			stBld.append(value.toString());
+	        			first = false;
+	        		} else {
+	        			stBld.append(itemDelim).append(value.toString());
+	        		}
         		}
-        	}    	
+        	}   
+        	
         	key.setDelim(itemDelim);
-        	valueOut.set(key.toString() + fieldDelim + stBld.toString());
+        	if (outputCount) {
+        		valueOut.set(key.toString() + fieldDelim + count);
+        	} else {
+        		valueOut.set(key.toString() + fieldDelim + stBld.toString());
+        	}
 			context.write(NullWritable.get(), valueOut);
     	}
     }
