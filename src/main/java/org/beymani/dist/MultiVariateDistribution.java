@@ -77,6 +77,7 @@ public  class MultiVariateDistribution extends Configured implements Tool {
 	}
 
 	public static class HistogramMapper extends Mapper<LongWritable, Text, Tuple , Text> {
+		private String[] items;
 		private Tuple outKey = new Tuple();
 		private Text outVal = new Text();
         private String fieldDelimRegex;
@@ -85,6 +86,8 @@ public  class MultiVariateDistribution extends Configured implements Tool {
         private Integer keyCompInt;
         private int numFields;
         private HistogramField partitionField;
+        private HistogramField idField;
+        private int[] fieldOrdinals;
         
         protected void setup(Context context) throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
@@ -99,12 +102,14 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             
             numFields = schema.getFields().size();
             partitionField = schema.getPartitionField();
+            idField = schema.getIdField();
+            fieldOrdinals = Utility.intArrayFromString(conf.get("hist.field.ordinals"));
        }
 
         @Override
         protected void map(LongWritable key, Text value, Context context)
             throws IOException, InterruptedException {
-            String[] items  =  value.toString().split(fieldDelimRegex);
+            items  =  value.toString().split(fieldDelimRegex);
             if ( items.length  != numFields){
             	context.getCounter("Data", "Invalid").increment(1);
             	return;
@@ -115,24 +120,48 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             	outKey.add(items[partitionField.getOrdinal()]);
             }
             
-            for (HistogramField field : schema.getFields()) {
-            	String	item = items[field.getOrdinal()];
-            	if (field.isCategorical()){
-            		keyCompSt = item;
-            		outKey.add(keyCompSt);
-            	} else if (field.isInteger()) {
-            		keyCompInt = Integer.parseInt(item) /  field.getBucketWidth();
-            		outKey.add(keyCompInt);
-            	} else if (field.isDouble()) {
-            		keyCompInt = ((int)Double.parseDouble(item)) /  field.getBucketWidth();
-            		outKey.add(keyCompInt);
-            	} else if (field.isId()) {
-            		outVal.set(item);
+            if (null != fieldOrdinals) {
+            	//use specified fields only
+            	for (int i : fieldOrdinals) {
+            		HistogramField field = schema.findAttributeByOrdinal(i);
+	            	buildKey(field);
             	}
+        		String	item = items[idField.getOrdinal()];
+        		outVal.set(item);
+            } else {
+            	//use all fields
+	            for (HistogramField field : schema.getFields()) {
+	            	buildKey(field);
+	            	if (field.isId()) {
+	            		String	item = items[field.getOrdinal()];
+	            		outVal.set(item);
+	            	}
+	            }
             }
         	context.getCounter("Data", "Processed record").increment(1);
 			context.write(outKey, outVal);
        }
+        
+        /**
+         * @param field
+         */
+        private void buildKey(HistogramField field) {
+        	if (!field.isId() && !field.isPartitionAttribute()) {
+	        	String	item = items[field.getOrdinal()];
+	        	if (field.isCategorical()){
+	        		keyCompSt = item;
+	        		outKey.add(keyCompSt);
+	        	} else if (field.isInteger()) {
+	        		keyCompInt = Integer.parseInt(item) /  field.getBucketWidth();
+	        		outKey.add(keyCompInt);
+	        	} else if (field.isDouble()) {
+	        		keyCompInt = ((int)Double.parseDouble(item)) /  field.getBucketWidth();
+	        		outKey.add(keyCompInt);
+	        	} else if (field.isId()) {
+	        		outVal.set(item);
+	        	}
+        	}
+        }
 	}
 	
     /**
