@@ -15,15 +15,21 @@
  * permissions and limitations under the License.
  */
 
+
 package org.beymani.dist;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
@@ -41,11 +47,10 @@ import org.chombo.util.Utility;
 import org.codehaus.jackson.map.ObjectMapper;
 
 /**
- * Multivariate distribution
  * @author pranab
  *
  */
-public  class MultiVariateDistribution extends Configured implements Tool {
+public class MultigramMultiVariateDistribution extends Configured implements Tool {
 
 	@Override
 	public int run(String[] args) throws Exception {
@@ -53,22 +58,22 @@ public  class MultiVariateDistribution extends Configured implements Tool {
         String jobName = "Muti variate distribution  MR";
         job.setJobName(jobName);
         
-        job.setJarByClass(MultiVariateDistribution.class);
+        job.setJarByClass(MultigramMultiVariateDistribution.class);
         
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
         
-        job.setMapperClass(MultiVariateDistribution.HistogramMapper.class);
-        job.setReducerClass(MultiVariateDistribution.HistogramReducer.class);
+        job.setMapperClass(MultigramMultiVariateDistribution.HistogramMapper.class);
+        job.setReducerClass(MultigramMultiVariateDistribution.HistogramReducer.class);
         
         job.setMapOutputKeyClass(Tuple.class);
-        job.setMapOutputValueClass(Text.class);
+        job.setMapOutputValueClass(IntWritable.class);
 
         job.setOutputKeyClass(NullWritable.class);
         job.setOutputValueClass(Text.class);
 
         Utility.setConfiguration(job.getConfiguration());
-        int numReducer = job.getConfiguration().getInt("mvd.num.reducer", -1);
+        int numReducer = job.getConfiguration().getInt("mmvd.num.reducer", -1);
         numReducer = -1 == numReducer ? job.getConfiguration().getInt("num.reducer", 1) : numReducer;
         job.setNumReduceTasks(numReducer);
         
@@ -76,10 +81,14 @@ public  class MultiVariateDistribution extends Configured implements Tool {
         return status;
 	}
 
-	public static class HistogramMapper extends Mapper<LongWritable, Text, Tuple , Text> {
+	/**
+	 * @author pranab
+	 *
+	 */
+	public static class HistogramMapper extends Mapper<LongWritable, Text, Tuple, IntWritable> {
 		private String[] items;
 		private Tuple outKey = new Tuple();
-		private Text outVal = new Text();
+		private IntWritable outVal = new IntWritable(1);
         private String fieldDelimRegex;
         private HistogramSchema schema;
         private String keyCompSt;
@@ -88,6 +97,11 @@ public  class MultiVariateDistribution extends Configured implements Tool {
         private HistogramField partitionField;
         private HistogramField idField;
         private int[] fieldOrdinals;
+        private Map<String, List<Object[]>> sequences = new HashMap<String, List<Object[]>>();
+        private int fieldCount;
+        private int sequenceLength;
+        private String id;
+        private String partitionAttr;
         
         protected void setup(Context context) throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
@@ -104,73 +118,113 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             partitionField = schema.getPartitionField();
             idField = schema.getIdField();
             fieldOrdinals = Utility.intArrayFromString(conf.get("hist.field.ordinals"));
+            if (null != fieldOrdinals) {
+            	fieldCount = fieldOrdinals.length;
+            } else {
+            	fieldCount = schema.getAttributeCount(true, true);
+            }
+            sequenceLength = conf.getInt("sequence.length", 3);
        }
 
         @Override
         protected void map(LongWritable key, Text value, Context context)
             throws IOException, InterruptedException {
             items  =  value.toString().split(fieldDelimRegex);
-            if ( items.length  != numFields){
+            if (items.length  != numFields){
             	context.getCounter("Data", "Invalid").increment(1);
             	return;
             }
             
-            outKey.initialize();
             if(null != partitionField) {
-            	outKey.add(items[partitionField.getOrdinal()]);
+            	partitionAttr = items[partitionField.getOrdinal()];
+            }
+
+            id = items[idField.getOrdinal()];
+            List<Object[]> sequence = sequences.get(id);
+            if (null == sequence) {
+            	sequence = new ArrayList<Object[]>();
+            	sequences.put(id, sequence);
             }
             
+            Object[] rec;
+            if (sequence.size() == sequenceLength) {
+            	//full sequence
+            	rec = sequence.remove(0);
+            } else {
+            	//partial sequence
+            	rec = new Object[fieldCount];
+            }
+            
+            //build record
+        	int j = 0;
             if (null != fieldOrdinals) {
             	//use specified fields only
             	for (int i : fieldOrdinals) {
             		HistogramField field = schema.findAttributeByOrdinal(i);
-	            	buildKey(field);
+	            	buildRec(rec, j, field);
+	            	++j;
             	}
-        		String	item = items[idField.getOrdinal()];
-        		outVal.set(item);
             } else {
             	//use all fields
 	            for (HistogramField field : schema.getFields()) {
-	            	buildKey(field);
-	            	if (field.isId()) {
-	            		String	item = items[field.getOrdinal()];
-	            		outVal.set(item);
-	            	}
+	            	buildRec(rec, j, field);
+	            	++j;
 	            }
             }
-        	context.getCounter("Data", "Processed record").increment(1);
-			context.write(outKey, outVal);
+            
+            //add record to sequence
+        	sequence.add(rec);
+            if (sequence.size() == sequenceLength)  {
+            	//emit
+            	buildKey();
+            	context.write(outKey, outVal);
+            }
        }
         
         /**
          * @param field
          */
-        private void buildKey(HistogramField field) {
+        private void buildKey() {
+        	outKey.initialize();
+        	if (null == partitionAttr) {
+        		outKey.add(partitionAttr);
+        	}
+        	List<Object[]> sequence = sequences.get(id);
+        	for (Object[] rec : sequence) {
+        		for (Object field : rec) {
+        			outKey.add(field);
+        		}
+        	}
+        }
+        
+        /**
+         * @param field
+         */
+        private void buildRec(Object[] rec, int index, HistogramField field) {
         	if (!field.isId() && !field.isPartitionAttribute()) {
 	        	String	item = items[field.getOrdinal()];
 	        	if (field.isCategorical()){
 	        		keyCompSt = item;
-	        		outKey.add(keyCompSt);
+	        		rec[index] = keyCompSt;
 	        	} else if (field.isInteger()) {
 	        		keyCompInt = Integer.parseInt(item) /  field.getBucketWidth();
-	        		outKey.add(keyCompInt);
+	        		rec[index] = keyCompInt;
 	        	} else if (field.isDouble()) {
 	        		keyCompInt = ((int)Double.parseDouble(item)) /  field.getBucketWidth();
-	        		outKey.add(keyCompInt);
+	        		rec[index] = keyCompInt;
 	        	} 
         	}
         }
+        
 	}
 	
     /**
      * @author pranab
      *
      */
-    public static class HistogramReducer extends Reducer<Tuple, Text, NullWritable, Text> {
+    public static class HistogramReducer extends Reducer<Tuple, IntWritable, NullWritable, Text> {
     	private Text valueOut = new Text();
     	private String fieldDelim ;
-        private String itemDelim;
-        private boolean outputCount;
         private int count;
         
         /* (non-Javadoc)
@@ -179,43 +233,27 @@ public  class MultiVariateDistribution extends Configured implements Tool {
         protected void setup(Context context) throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
         	fieldDelim = conf.get("field.delim", "[]");
-        	itemDelim = conf.get("item.delim", ",");
-        	outputCount = conf.getBoolean("output.count", false);
         }    	
         
-    	protected void reduce(Tuple key, Iterable<Text> values, Context context)
+    	protected void reduce(Tuple key, Iterable<IntWritable> values, Context context)
         	throws IOException, InterruptedException {
-   		    StringBuilder stBld = new  StringBuilder();
-   		    boolean first = true;
    		    count = 0;
-        	for (Text value : values){
-        		if (outputCount) {
-        			++count;
-        		} else {
-	        		if (first) {
-	        			stBld.append(value.toString());
-	        			first = false;
-	        		} else {
-	        			stBld.append(itemDelim).append(value.toString());
-	        		}
-        		}
+        	for (IntWritable value : values){
+        		count += value.get();
         	}   
         	
-        	key.setDelim(itemDelim);
-        	if (outputCount) {
-        		valueOut.set(key.toString() + fieldDelim + count);
-        	} else {
-        		valueOut.set(key.toString() + fieldDelim + stBld.toString());
-        	}
+        	key.setDelim(fieldDelim);
+        	valueOut.set(key.toString() + fieldDelim + count);
 			context.write(NullWritable.get(), valueOut);
     	}
     }
- 
+	
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) throws Exception {
-        int exitCode = ToolRunner.run(new MultiVariateDistribution(), args);
+        int exitCode = ToolRunner.run(new MultigramMultiVariateDistribution(), args);
         System.exit(exitCode);
 	}
+
 }
