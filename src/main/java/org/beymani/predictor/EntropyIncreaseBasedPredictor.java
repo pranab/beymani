@@ -17,18 +17,7 @@
 
 package org.beymani.predictor;
 
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Scanner;
-
-import org.chombo.mr.HistogramField;
-import org.chombo.mr.HistogramSchema;
-import org.chombo.storm.Cache;
-import org.chombo.storm.MessageQueue;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.codehaus.jackson.map.ObjectMapper;
 
 /**
  * Predict outlier based on increase of entropy resulting from including outlier point

@@ -23,10 +23,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
-import org.chombo.mr.HistogramField;
-import org.chombo.mr.HistogramSchema;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
+import org.chombo.util.RichAttribute;
+import org.chombo.util.RichAttributeSchema;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -40,7 +40,7 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected Cache cache;
 	protected Map<String, Integer> distrModel = new HashMap<String, Integer>();
 	protected int totalCount;
-	protected HistogramSchema schema;
+	protected RichAttributeSchema schema;
 	protected double scoreThreshold;
 	protected StringBuilder stBld = new StringBuilder();
 	protected String subFieldDelim = ";";
@@ -69,7 +69,7 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 		String schemaStr = cache.get(schemaKey);
 		ObjectMapper mapper = new ObjectMapper();
 		try {
-			schema = mapper.readValue(schemaStr, HistogramSchema.class);
+			schema = mapper.readValue(schemaStr, RichAttributeSchema.class);
 		} catch (JsonParseException e) {
 			throw new IllegalStateException("invalid JSON schema");
 		} catch (JsonMappingException e) {
@@ -91,7 +91,7 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 		
 		stBld.delete(0, stBld.length());
 		String bucketElement = null;
-		for (HistogramField field : schema.getFields()) {
+		for (RichAttribute field : schema.getFields()) {
 			String	item = items[field.getOrdinal()];
 			if (field.isCategorical()){
 				bucketElement = item;

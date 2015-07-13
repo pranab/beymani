@@ -32,13 +32,12 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.chombo.mr.HistogramField;
-import org.chombo.mr.HistogramSchema;
+import org.chombo.util.RichAttribute;
+import org.chombo.util.RichAttributeSchema;
 import org.chombo.util.Tuple;
 import org.chombo.util.Utility;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -86,7 +85,7 @@ public class DistributionSorter extends Configured implements Tool {
 		private Tuple outKey = new Tuple();
 		private Text outVal = new Text();
         private String fieldDelimRegex;
-        private HistogramSchema schema;
+        private RichAttributeSchema schema;
         private String[] bucketKeys;
         private String  bucketValues;
         private String itemDelim;
@@ -103,11 +102,11 @@ public class DistributionSorter extends Configured implements Tool {
             Path src = new Path(filePath);
             FSDataInputStream fs = dfs.open(src);
             ObjectMapper mapper = new ObjectMapper();
-            schema = mapper.readValue(fs, HistogramSchema.class);
+            schema = mapper.readValue(fs, RichAttributeSchema.class);
         	itemDelim = conf.get("item.delim", ",");
         	
         	List<Byte> dataTypes = new ArrayList<Byte>();
-            for (HistogramField field : schema.getFields()) {
+            for (RichAttribute field : schema.getFields()) {
             	if (field.isCategorical()){
             		dataTypes.add( Tuple.STRING);
             	} else if (field.isInteger() || field.isDouble()) {
