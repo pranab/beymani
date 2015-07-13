@@ -34,7 +34,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.chombo.mr.HistogramSchema;
+import org.chombo.util.RichAttributeSchema;
 import org.chombo.util.Tuple;
 import org.chombo.util.Utility;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -84,7 +84,7 @@ public class EntropyBasedDistributionSorter extends Configured implements Tool {
 		private Tuple outKey = new Tuple();
 		private Tuple outVal = new Tuple();
         private String fieldDelimRegex;
-        private HistogramSchema schema;
+        private RichAttributeSchema schema;
         private String  bucketValues;
         private String itemDelim;
         private Integer valueCount;
@@ -102,7 +102,7 @@ public class EntropyBasedDistributionSorter extends Configured implements Tool {
             Path src = new Path(filePath);
             FSDataInputStream fs = dfs.open(src);
             ObjectMapper mapper = new ObjectMapper();
-            schema = mapper.readValue(fs, HistogramSchema.class);
+            schema = mapper.readValue(fs, RichAttributeSchema.class);
         	itemDelim = conf.get("item.delim", ",");
         	totalItemCount = conf.getInt("total.Item.count", -1);
         	if (totalItemCount == -1) {
@@ -115,7 +115,7 @@ public class EntropyBasedDistributionSorter extends Configured implements Tool {
             throws IOException, InterruptedException {
             String[] items  =  value.toString().split(fieldDelimRegex);
             if ( items.length  != 2){
-            	context.getCounter("Data", "Invalid").increment(1);
+            	//context.getCounter("Data", "Invalid").increment(1);
             	return;
             }
             bucketValues = items[1];

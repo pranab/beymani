@@ -21,7 +21,7 @@ package org.beymani.predictor;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.chombo.mr.HistogramField;
+import org.chombo.util.RichAttribute;
 
 /**
  * Outlier detection based weighted cumulative probability of all attributes
@@ -39,7 +39,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		
 		//per attribute distribution
 		int i = 0;
-		for (HistogramField field : schema.getFields()) {
+		for (RichAttribute field : schema.getFields()) {
 			Integer ordinal = field.getOrdinal();
 			Map<String, Integer> distr = attrDistr.get(ordinal);
 			if (null == distr){
@@ -80,7 +80,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		int i = 0;
 		double score = 0;
 		int rareCount = 0;
-		for (HistogramField field : schema.getFields()) {
+		for (RichAttribute field : schema.getFields()) {
 			Integer ordinal = field.getOrdinal();
 			String bucketElem = bucketElements[i];
 			Integer count  = attrDistr.get(ordinal).get(bucketElem);

@@ -40,8 +40,8 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.chombo.mr.HistogramField;
-import org.chombo.mr.HistogramSchema;
+import org.chombo.util.RichAttribute;
+import org.chombo.util.RichAttributeSchema;
 import org.chombo.util.Tuple;
 import org.chombo.util.Utility;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -90,12 +90,12 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
 		private Tuple outKey = new Tuple();
 		private IntWritable outVal = new IntWritable(1);
         private String fieldDelimRegex;
-        private HistogramSchema schema;
+        private RichAttributeSchema schema;
         private String keyCompSt;
         private Integer keyCompInt;
         private int numFields;
-        private HistogramField partitionField;
-        private HistogramField idField;
+        private RichAttribute partitionField;
+        private RichAttribute idField;
         private int[] fieldOrdinals;
         private Map<String, List<Object[]>> sequences = new HashMap<String, List<Object[]>>();
         private int fieldCount;
@@ -112,7 +112,7 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
             Path src = new Path(filePath);
             FSDataInputStream fs = dfs.open(src);
             ObjectMapper mapper = new ObjectMapper();
-            schema = mapper.readValue(fs, HistogramSchema.class);
+            schema = mapper.readValue(fs, RichAttributeSchema.class);
             
             numFields = schema.getFields().size();
             partitionField = schema.getPartitionField();
@@ -131,7 +131,7 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
             throws IOException, InterruptedException {
             items  =  value.toString().split(fieldDelimRegex);
             if (items.length  != numFields){
-            	context.getCounter("Data", "Invalid").increment(1);
+            	//context.getCounter("Data", "Invalid").increment(1);
             	return;
             }
             
@@ -160,13 +160,13 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
             if (null != fieldOrdinals) {
             	//use specified fields only
             	for (int i : fieldOrdinals) {
-            		HistogramField field = schema.findAttributeByOrdinal(i);
+            		RichAttribute field = schema.findAttributeByOrdinal(i);
 	            	buildRec(rec, j, field);
 	            	++j;
             	}
             } else {
             	//use all fields
-	            for (HistogramField field : schema.getFields()) {
+	            for (RichAttribute field : schema.getFields()) {
 	            	buildRec(rec, j, field);
 	            	++j;
 	            }
@@ -200,7 +200,7 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
         /**
          * @param field
          */
-        private void buildRec(Object[] rec, int index, HistogramField field) {
+        private void buildRec(Object[] rec, int index, RichAttribute field) {
         	if (!field.isId() && !field.isPartitionAttribute()) {
 	        	String	item = items[field.getOrdinal()];
 	        	if (field.isCategorical()){

@@ -34,8 +34,8 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.chombo.mr.HistogramField;
-import org.chombo.mr.HistogramSchema;
+import org.chombo.util.RichAttribute;
+import org.chombo.util.RichAttributeSchema;
 import org.chombo.util.Tuple;
 import org.chombo.util.Utility;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -81,12 +81,12 @@ public  class MultiVariateDistribution extends Configured implements Tool {
 		private Tuple outKey = new Tuple();
 		private Text outVal = new Text();
         private String fieldDelimRegex;
-        private HistogramSchema schema;
+        private RichAttributeSchema schema;
         private String keyCompSt;
         private Integer keyCompInt;
         private int numFields;
-        private HistogramField partitionField;
-        private HistogramField idField;
+        private RichAttribute partitionField;
+        private RichAttribute idField;
         private int[] fieldOrdinals;
         
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -98,7 +98,7 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             Path src = new Path(filePath);
             FSDataInputStream fs = dfs.open(src);
             ObjectMapper mapper = new ObjectMapper();
-            schema = mapper.readValue(fs, HistogramSchema.class);
+            schema = mapper.readValue(fs, RichAttributeSchema.class);
             
             numFields = schema.getFields().size();
             partitionField = schema.getPartitionField();
@@ -111,7 +111,7 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             throws IOException, InterruptedException {
             items  =  value.toString().split(fieldDelimRegex);
             if ( items.length  != numFields){
-            	context.getCounter("Data", "Invalid").increment(1);
+            	//context.getCounter("Data", "Invalid").increment(1);
             	return;
             }
             
@@ -123,14 +123,14 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             if (null != fieldOrdinals) {
             	//use specified fields only
             	for (int i : fieldOrdinals) {
-            		HistogramField field = schema.findAttributeByOrdinal(i);
+            		RichAttribute field = schema.findAttributeByOrdinal(i);
 	            	buildKey(field);
             	}
         		String	item = items[idField.getOrdinal()];
         		outVal.set(item);
             } else {
             	//use all fields
-	            for (HistogramField field : schema.getFields()) {
+	            for (RichAttribute field : schema.getFields()) {
 	            	buildKey(field);
 	            	if (field.isId()) {
 	            		String	item = items[field.getOrdinal()];
@@ -138,14 +138,14 @@ public  class MultiVariateDistribution extends Configured implements Tool {
 	            	}
 	            }
             }
-        	context.getCounter("Data", "Processed record").increment(1);
+        	//context.getCounter("Data", "Processed record").increment(1);
 			context.write(outKey, outVal);
        }
         
         /**
          * @param field
          */
-        private void buildKey(HistogramField field) {
+        private void buildKey(RichAttribute field) {
         	if (!field.isId() && !field.isPartitionAttribute()) {
 	        	String	item = items[field.getOrdinal()];
 	        	if (field.isCategorical()){
