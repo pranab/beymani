@@ -49,7 +49,6 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected double scoreThreshold;
 	protected StringBuilder stBld = new StringBuilder();
 	protected String subFieldDelim = ";";
-	protected boolean realTimeDetection;
 
 	/**
 	 * Storm usage
