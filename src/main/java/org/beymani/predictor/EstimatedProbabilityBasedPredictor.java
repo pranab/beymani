@@ -17,7 +17,10 @@
 
 package org.beymani.predictor;
 
+import java.io.IOException;
 import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
 
 /**
  * Estimated probability based outlier prediction
@@ -26,17 +29,32 @@ import java.util.Map;
  */
 public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredictor {
 
+	/**
+	 * Storm usage
+	 * @param conf
+	 */
 	public EstimatedProbabilityBasedPredictor(Map conf) {
 		super(conf);
+		realTimeDetection = true;
 	}
 
+	/**
+	 * Hadoop MR usage
+	 * @param config
+	 * @param distrFilePath
+	 * @throws IOException
+	 */
+	public EstimatedProbabilityBasedPredictor(Configuration config, String distrFilePath) throws IOException {
+		super(config, distrFilePath);
+	}
+	
 	@Override
 	public double execute(String entityID, String record) {
 		String bucketKey = getBucketKey(record);
 		Integer count = distrModel.get(bucketKey);
 		double pr = null != count ? (((double)count) / totalCount) : 0;
 		double score = 1.0 - pr;
-		if (score > scoreThreshold) {
+		if (realTimeDetection && score > scoreThreshold) {
 			//write if above threshold
 			outQueue.send(entityID + " " + score);
 		}

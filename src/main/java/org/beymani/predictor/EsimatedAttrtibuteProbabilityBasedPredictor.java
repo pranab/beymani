@@ -35,7 +35,6 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	private Map<Integer, Integer> attrDistrCounts = new HashMap<Integer, Integer>();
 	private double[] attrWeights;
 	private boolean requireMissingAttrValue;
-	private boolean realTimeDetection;
 	
 	/**
 	 * Storm usage
