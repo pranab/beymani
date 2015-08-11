@@ -47,6 +47,7 @@ import org.chombo.util.Utility;
 import org.codehaus.jackson.map.ObjectMapper;
 
 /**
+ * Multigram distribution on either single or multiple attributes
  * @author pranab
  *
  */
@@ -148,7 +149,7 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
             
             Object[] rec;
             if (sequence.size() == sequenceLength) {
-            	//full sequence
+            	//full sequence, reuse record
             	rec = sequence.remove(0);
             } else {
             	//partial sequence
@@ -186,11 +187,13 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
          */
         private void buildKey() {
         	outKey.initialize();
-        	if (null == partitionAttr) {
+        	if (null != partitionAttr) {
         		outKey.add(partitionAttr);
         	}
         	List<Object[]> sequence = sequences.get(id);
+        	//all records
         	for (Object[] rec : sequence) {
+        		//all fields
         		for (Object field : rec) {
         			outKey.add(field);
         		}
@@ -215,7 +218,6 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
 	        	} 
         	}
         }
-        
 	}
 	
     /**

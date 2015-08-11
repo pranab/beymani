@@ -18,9 +18,11 @@
 
 package org.beymani.predictor;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.hadoop.conf.Configuration;
 import org.chombo.util.RichAttribute;
 
 /**
@@ -33,10 +35,51 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	private Map<Integer, Integer> attrDistrCounts = new HashMap<Integer, Integer>();
 	private double[] attrWeights;
 	private boolean requireMissingAttrValue;
+	private boolean realTimeDetection;
 	
+	/**
+	 * Storm usage
+	 * @param conf
+	 */
 	public EsimatedAttrtibuteProbabilityBasedPredictor(Map conf) {
 		super(conf);
 		
+		//per attribute distribution
+		buildAttributeWiseDistr();
+		
+		//attribute weights
+		String[] weightStrs =  conf.get("attr.weight").toString().split(",");
+		attrWeights = new double[weightStrs.length];
+		for (int a = 0; a < weightStrs.length; ++a) {
+			attrWeights[a] = Double.parseDouble(weightStrs[a]);
+		}
+		
+		requireMissingAttrValue = Boolean.parseBoolean(conf.get("require.missing.attr.value").toString());
+		realTimeDetection = true;
+	}
+
+	/**
+	 * @param config
+	 * @param distrFilePath
+	 * @throws IOException
+	 */
+	public EsimatedAttrtibuteProbabilityBasedPredictor(Configuration config, String distrFilePath) throws IOException {
+		super(config, distrFilePath);
+		
+		buildAttributeWiseDistr();
+
+		//attribute weights
+		String[] weightStrs =  config.get("attr.weight").split(",");
+		attrWeights = new double[weightStrs.length];
+		for (int a = 0; a < weightStrs.length; ++a) {
+			attrWeights[a] = Double.parseDouble(weightStrs[a]);
+		}
+	}
+	
+	/**
+	 * 
+	 */
+	private void buildAttributeWiseDistr() {
 		//per attribute distribution
 		int i = 0;
 		for (RichAttribute field : schema.getFields()) {
@@ -62,17 +105,9 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 			attrDistrCounts.put(ordinal, totalCount);
 			++i;
 		}
-		
-		//attribute weights
-		String[] weightStrs =  conf.get("attr.weight").toString().split(",");
-		attrWeights = new double[weightStrs.length];
-		for (int a = 0; a < weightStrs.length; ++a) {
-			attrWeights[i] = Double.parseDouble(weightStrs[i]);
-		}
-		
-		requireMissingAttrValue = Boolean.parseBoolean(conf.get("require.missing.attr.value").toString());
 	}
-
+	
+	
 	@Override
 	public double execute(String entityID, String record) {
 		String bucketKey = getBucketKey(record);
@@ -95,7 +130,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		if (requireMissingAttrValue && rareCount == 0) {
 			score = 0;
 		}
-		if (score > scoreThreshold) {
+		if (realTimeDetection && score > scoreThreshold) {
 			//write if above threshold
 			outQueue.send(entityID + " " + score);
 		}

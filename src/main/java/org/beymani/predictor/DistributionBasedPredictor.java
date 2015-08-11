@@ -18,15 +18,20 @@
 
 package org.beymani.predictor;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
+import org.apache.hadoop.conf.Configuration;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
 import org.chombo.util.RichAttribute;
 import org.chombo.util.RichAttributeSchema;
+import org.chombo.util.Utility;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -45,6 +50,10 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected StringBuilder stBld = new StringBuilder();
 	protected String subFieldDelim = ";";
 
+	/**
+	 * Storm usage
+	 * @param conf
+	 */
 	public DistributionBasedPredictor(Map conf) {
 		super();
 		outQueue = MessageQueue.createMessageQueue(conf, conf.get("output.queue").toString());
@@ -79,7 +88,30 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 		}
 		
 		scoreThreshold =  Double.parseDouble(conf.get("score.threshold").toString());
+	}
+	
+	/**
+	 * Hadoop MR usage
+	 * @param config
+	 * @throws IOException 
+	 */
+	public DistributionBasedPredictor(Configuration config, String distrFilePath) throws IOException {
+		super();
+
+    	InputStream fs = Utility.getFileStream(config, distrFilePath);
+    	BufferedReader reader = new BufferedReader(new InputStreamReader(fs));
+    	String line = null; 
+    	String[] items = null;
 		
+    	while((line = reader.readLine()) != null) {
+    		items = line.split(",");
+  		  	int count = Integer.parseInt(items[1]);
+  		  	totalCount += count;
+  		  	distrModel.put(items[0], count);
+    	} 	
+    	
+    	schema = Utility.getRichAttributeSchema(config, "distr.schema.file.path");
+    	scoreThreshold =  Double.parseDouble(config.get("score.threshold"));
 	}
 	
 	/**
