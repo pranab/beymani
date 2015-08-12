@@ -21,6 +21,9 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.chombo.storm.Cache;
+import org.chombo.storm.MessageQueue;
+import org.chombo.util.ConfigUtility;
 import org.chombo.util.MedianStatsManager;
 import org.chombo.util.NumericalAttrStatsManager;
 import org.chombo.util.Utility;
@@ -37,15 +40,38 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	private String fieldDelim;
 	private boolean robustZscore;
 	private double[] attrWeights;
+	protected MessageQueue outQueue;
+	protected Cache cache;
 	
 	/**
-	 * @param conf
+	 * Storm usage
+	 * @param config
+	 * @param idOrdinalsParam
+	 * @param attrListParam
+	 * @param fieldDelimParam
+	 * @param attrWeightParam
+	 * @param statsModelKeyParam
+	 * @throws IOException
 	 */
-	public ZscorePredictor(Map conf) {
-		//TODO
+	public ZscorePredictor(Map config, String idOrdinalsParam, String attrListParam, String fieldDelimParam, 
+			String attrWeightParam, String statsModelKeyParam) 
+		throws IOException {
+		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
+		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
+		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
+
+		outQueue = MessageQueue.createMessageQueue(config, config.get("output.queue").toString());
+		cache = Cache.createCache(config);
+		
+		String modelKey =  config.get(statsModelKeyParam).toString();
+		String model = cache.get(modelKey);
+		statsManager = new NumericalAttrStatsManager(model, ",");
+
+		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 	}
 	
 	/**
+	 * Hadoop MR usage
 	 * @param config
 	 * @param idOrdinalsParam
 	 * @param asttrListParam
@@ -55,21 +81,18 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	 * @throws IOException
 	 */
 	public ZscorePredictor(Configuration config, String idOrdinalsParam, String attrListParam, 
-		String statsFilePath,  String fieldDelimParam) throws IOException {
+		String statsFilePath,  String fieldDelimParam, String attrWeightParam) throws IOException {
 		idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
 		attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
 		statsManager = new NumericalAttrStatsManager(config, statsFilePath, ",");
 		fieldDelim = config.get(fieldDelimParam, ",");
 		
 		//attribute weights
-		String[] weightStrs =  config.get("attr.weight").split(",");
-		attrWeights = new double[weightStrs.length];
-		for (int a = 0; a < weightStrs.length; ++a) {
-			attrWeights[a] = Double.parseDouble(weightStrs[a]);
-		}
+		attrWeights = Utility.doubleArrayFromString(config.get(attrWeightParam), fieldDelim);
 	}
 	
 	/**
+	 * Hadoop MR usage
 	 * @param config
 	 * @param idOrdinalsParam
 	 * @param attrListParam
@@ -79,7 +102,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	 * @throws IOException
 	 */
 	public ZscorePredictor(Configuration config, String idOrdinalsParam, String attrListParam, 
-			String medFilePathParam, String madFilePathParam,  String fieldDelimParam) throws IOException {
+			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam) throws IOException {
 			idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
 			attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
     		medStatManager = new MedianStatsManager(config, medFilePathParam, madFilePathParam,  
@@ -88,11 +111,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 			fieldDelim = config.get(fieldDelimParam, ",");
 			
 			//attribute weights
-			String[] weightStrs =  config.get("attr.weight").split(",");
-			attrWeights = new double[weightStrs.length];
-			for (int a = 0; a < weightStrs.length; ++a) {
-				attrWeights[a] = Double.parseDouble(weightStrs[a]);
-			}
+			attrWeights = Utility.doubleArrayFromString(config.get(attrWeightParam), fieldDelim);
 			robustZscore = true;
 		}
 
