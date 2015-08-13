@@ -25,17 +25,16 @@ import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
 import org.chombo.util.ConfigUtility;
 import org.chombo.util.MedianStatsManager;
-import org.chombo.util.NumericalAttrStatsManager;
 import org.chombo.util.Utility;
 
 /**
  * @author pranab
  *
  */
-public class ZscorePredictor  extends ModelBasedPredictor{
+public class RobustZscorePredictor extends ModelBasedPredictor {
 	private int[] idOrdinals;
 	private int[] attrOrdinals;
-	private NumericalAttrStatsManager statsManager;
+    private MedianStatsManager medStatManager;
 	private String fieldDelim;
 	private double[] attrWeights;
 	protected MessageQueue outQueue;
@@ -48,11 +47,13 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	 * @param attrListParam
 	 * @param fieldDelimParam
 	 * @param attrWeightParam
-	 * @param statsModelKeyParam
+	 * @param medModelKeyParam
+	 * @param madModelKeyParam
+	 * @param scoreThresholdParam
 	 * @throws IOException
 	 */
-	public ZscorePredictor(Map config, String idOrdinalsParam, String attrListParam, String fieldDelimParam, 
-			String attrWeightParam, String statsModelKeyParam, String scoreThresholdParam) 
+	public RobustZscorePredictor(Map config, String idOrdinalsParam, String attrListParam, String fieldDelimParam, 
+			String attrWeightParam, String medModelKeyParam, String madModelKeyParam, String scoreThresholdParam) 
 		throws IOException {
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
@@ -61,36 +62,39 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		outQueue = MessageQueue.createMessageQueue(config, config.get("output.queue").toString());
 		cache = Cache.createCache(config);
 		
-		String modelKey =  config.get(statsModelKeyParam).toString();
-		String model = cache.get(modelKey);
-		statsManager = new NumericalAttrStatsManager(model, ",");
+		String medlKey =  config.get(medModelKeyParam).toString();
+		String medContent = cache.get(medlKey);
+		String madlKey =  config.get(madModelKeyParam).toString();
+		String madContent = cache.get(madlKey);
+		medStatManager=  new MedianStatsManager(medContent, madContent, ",", idOrdinals);
 
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam, 3.0);
 		realTimeDetection = true;
 	}
-
+	
 	/**
-	 * Hadoop MR usage for z score
+	 * Hadoop MR usage for robust zscore
 	 * @param config
 	 * @param idOrdinalsParam
-	 * @param asttrListParam
-	 * @param statsFilePath
-	 * @param schemaFilePath
+	 * @param attrListParam
+	 * @param medFilePathParam
+	 * @param madFilePathParam
 	 * @param fieldDelimParam
 	 * @throws IOException
 	 */
-	public ZscorePredictor(Configuration config, String idOrdinalsParam, String attrListParam, 
-		String statsFilePath,  String fieldDelimParam, String attrWeightParam) throws IOException {
-		idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
-		attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
-		statsManager = new NumericalAttrStatsManager(config, statsFilePath, ",");
-		fieldDelim = config.get(fieldDelimParam, ",");
-		
-		//attribute weights
-		attrWeights = Utility.doubleArrayFromString(config.get(attrWeightParam), fieldDelim);
+	public RobustZscorePredictor(Configuration config, String idOrdinalsParam, String attrListParam, 
+			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam) throws IOException {
+			idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
+			attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
+    		medStatManager = new MedianStatsManager(config, medFilePathParam, madFilePathParam,  
+        			",",  idOrdinals);
+
+			fieldDelim = config.get(fieldDelimParam, ",");
+			
+			//attribute weights
+			attrWeights = Utility.doubleArrayFromString(config.get(attrWeightParam), fieldDelim);
 	}
-	
 
 	@Override
 	public double execute(String entityID, String record) {
@@ -102,12 +106,11 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 			double val = Double.parseDouble(items[ord]);
 			if (null != idOrdinals) {
 				String compKey = Utility.join(items, idOrdinals, fieldDelim);
-				score  += (Math.abs( val -  statsManager.getMean(compKey,ord)) / statsManager.getStdDev(compKey, ord)) * attrWeights[i];
-			} else {
-				score  += (Math.abs( val -  statsManager.getMean(ord)) / statsManager.getStdDev(ord)) * attrWeights[i];
+				score  += (Math.abs( val - medStatManager.getKeyedMedian(compKey, ord) ) / 
+						medStatManager.getKeyedMedAbsDivergence(compKey, ord)) * attrWeights[i];
+			}	else {
+				score  += (Math.abs( val -  medStatManager.getMedian(ord)) / medStatManager.getMedAbsDivergence(ord)) * attrWeights[i];
 			}
-			totalWt += attrWeights[i];
-			++i;
 		}
 		score /=  totalWt ;
 
@@ -117,5 +120,4 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		}
 		return score;
 	}
-
 }

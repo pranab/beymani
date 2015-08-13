@@ -24,6 +24,7 @@ package org.beymani.predictor;
  */
 public abstract class ModelBasedPredictor {
 	protected boolean realTimeDetection;
+	protected double scoreThreshold;
 
 	public abstract double execute(String entityID, String record); 
 }

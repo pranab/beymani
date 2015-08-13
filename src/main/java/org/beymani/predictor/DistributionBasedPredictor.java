@@ -46,7 +46,6 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected Map<String, Integer> distrModel = new HashMap<String, Integer>();
 	protected int totalCount;
 	protected RichAttributeSchema schema;
-	protected double scoreThreshold;
 	protected StringBuilder stBld = new StringBuilder();
 	protected String subFieldDelim = ";";
 
