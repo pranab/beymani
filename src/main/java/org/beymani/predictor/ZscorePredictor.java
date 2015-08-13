@@ -24,7 +24,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
 import org.chombo.util.ConfigUtility;
-import org.chombo.util.MedianStatsManager;
 import org.chombo.util.NumericalAttrStatsManager;
 import org.chombo.util.Utility;
 
@@ -81,10 +80,10 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	 * @throws IOException
 	 */
 	public ZscorePredictor(Configuration config, String idOrdinalsParam, String attrListParam, 
-		String statsFilePath,  String fieldDelimParam, String attrWeightParam) throws IOException {
+		String statsFilePathParam,  String fieldDelimParam, String attrWeightParam) throws IOException {
 		idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
 		attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
-		statsManager = new NumericalAttrStatsManager(config, statsFilePath, ",");
+		statsManager = new NumericalAttrStatsManager(config, statsFilePathParam, ",");
 		fieldDelim = config.get(fieldDelimParam, ",");
 		
 		//attribute weights
