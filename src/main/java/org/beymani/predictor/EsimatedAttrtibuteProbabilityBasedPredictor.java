@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.chombo.util.RichAttribute;
+import org.chombo.util.Utility;
 
 /**
  * Outlier detection based weighted cumulative probability of all attributes
@@ -35,6 +36,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	private Map<Integer, Integer> attrDistrCounts = new HashMap<Integer, Integer>();
 	private double[] attrWeights;
 	private boolean requireMissingAttrValue;
+	private String fieldDelim;
 	
 	/**
 	 * Storm usage
@@ -58,21 +60,21 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	}
 
 	/**
+	 * Hadoop MR usage
 	 * @param config
 	 * @param distrFilePath
 	 * @throws IOException
 	 */
-	public EsimatedAttrtibuteProbabilityBasedPredictor(Configuration config, String distrFilePath) throws IOException {
+	public EsimatedAttrtibuteProbabilityBasedPredictor(Configuration config, String distrFilePath, String attrWeightParam, 
+		String scoreThresholdParam, String fieldDelimParam) throws IOException {
 		super(config, distrFilePath);
 		
 		buildAttributeWiseDistr();
 
 		//attribute weights
-		String[] weightStrs =  config.get("attr.weight").split(",");
-		attrWeights = new double[weightStrs.length];
-		for (int a = 0; a < weightStrs.length; ++a) {
-			attrWeights[a] = Double.parseDouble(weightStrs[a]);
-		}
+		fieldDelim = config.get(fieldDelimParam, ",");
+		attrWeights = Utility.doubleArrayFromString(config.get(attrWeightParam), fieldDelim);
+		scoreThreshold = Double.parseDouble( config.get( scoreThresholdParam));
 	}
 	
 	/**
@@ -129,7 +131,8 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		if (requireMissingAttrValue && rareCount == 0) {
 			score = 0;
 		}
-		if (realTimeDetection && score > scoreThreshold) {
+		scoreAboveThreshold = score > scoreThreshold;
+		if (realTimeDetection && scoreAboveThreshold) {
 			//write if above threshold
 			outQueue.send(entityID + " " + score);
 		}

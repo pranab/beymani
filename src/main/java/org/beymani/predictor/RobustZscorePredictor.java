@@ -84,7 +84,8 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	 * @throws IOException
 	 */
 	public RobustZscorePredictor(Configuration config, String idOrdinalsParam, String attrListParam, 
-			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam) throws IOException {
+			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam, 
+			String scoreThresholdParam) throws IOException {
 			idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
 			attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
     		medStatManager = new MedianStatsManager(config, medFilePathParam, madFilePathParam,  
@@ -94,6 +95,7 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 			
 			//attribute weights
 			attrWeights = Utility.doubleArrayFromString(config.get(attrWeightParam), fieldDelim);
+			scoreThreshold = Double.parseDouble( config.get( scoreThresholdParam));
 	}
 
 	@Override
@@ -113,8 +115,8 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 			}
 		}
 		score /=  totalWt ;
-
-		if (realTimeDetection && score > scoreThreshold) {
+		scoreAboveThreshold = score > scoreThreshold;
+		if (realTimeDetection && scoreAboveThreshold) {
 			//write if above threshold
 			outQueue.send(entityID + " " + score);
 		}

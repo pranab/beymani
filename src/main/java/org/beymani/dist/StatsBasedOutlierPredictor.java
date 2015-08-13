@@ -87,12 +87,13 @@ public class StatsBasedOutlierPredictor  extends Configured implements Tool {
         	predictorStartegy = config.get("predictor.startegy", PRED_STRATEGY_ZSCORE);
         	
         	if (predictorStartegy.equals(PRED_STRATEGY_ZSCORE)) {
-        		predictor = new ZscorePredictor(config,  "id.field.ordinals",  "attr.list", "stats.file.path",  "field.delim.regex", "attr.weight");
+        		predictor = new ZscorePredictor(config,  "id.field.ordinals",  "attr.list", "stats.file.path",  "field.delim.regex", 
+        				"attr.weight", "score.threshold");
         	} else if (predictorStartegy.equals(PRED_STRATEGY_ROBUST_ZSCORE)) {
         		predictor = new RobustZscorePredictor(config,  "id.field.ordinals",  "attr.list", "med.stats.file.path", "mad.stats.file.path", 
-        				"field.delim.regex", "attr.weight");
+        				"field.delim.regex", "attr.weight",  "score.threshold");
         	} else if (predictorStartegy.equals(PRED_STRATEGY_EST_PROB)) {
-        		predictor = new EstimatedProbabilityBasedPredictor(config,  "distr.file.path");
+        		predictor = new EstimatedProbabilityBasedPredictor(config,  "distr.file.path",   "score.threshold" );
         	} else {
         		throw new IllegalArgumentException("ivalid predictor strategy");
         	}
@@ -102,8 +103,11 @@ public class StatsBasedOutlierPredictor  extends Configured implements Tool {
         protected void map(LongWritable key, Text value, Context context)
             throws IOException, InterruptedException {
             double score = predictor.execute(null,  value.toString());
-            outVal.set(value.toString() + fieldDelim + score);
-			context.write(NullWritable.get(), outVal);
+            
+            if (predictor.isScoreAboveThreshold()) {
+            	outVal.set(value.toString() + fieldDelim + score);
+            	context.write(NullWritable.get(), outVal);
+            }
         }
 	}	
 

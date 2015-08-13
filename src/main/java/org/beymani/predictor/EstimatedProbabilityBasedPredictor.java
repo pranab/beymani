@@ -44,8 +44,9 @@ public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredict
 	 * @param distrFilePath
 	 * @throws IOException
 	 */
-	public EstimatedProbabilityBasedPredictor(Configuration config, String distrFilePath) throws IOException {
+	public EstimatedProbabilityBasedPredictor(Configuration config, String distrFilePath, String scoreThresholdParam) throws IOException {
 		super(config, distrFilePath);
+		scoreThreshold = Double.parseDouble( config.get( scoreThresholdParam));
 	}
 	
 	@Override
@@ -54,7 +55,8 @@ public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredict
 		Integer count = distrModel.get(bucketKey);
 		double pr = null != count ? (((double)count) / totalCount) : 0;
 		double score = 1.0 - pr;
-		if (realTimeDetection && score > scoreThreshold) {
+		scoreAboveThreshold = score > scoreThreshold;
+		if (realTimeDetection && scoreAboveThreshold) {
 			//write if above threshold
 			outQueue.send(entityID + " " + score);
 		}

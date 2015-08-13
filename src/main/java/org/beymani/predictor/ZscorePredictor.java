@@ -80,7 +80,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	 * @throws IOException
 	 */
 	public ZscorePredictor(Configuration config, String idOrdinalsParam, String attrListParam, 
-		String statsFilePathParam,  String fieldDelimParam, String attrWeightParam) throws IOException {
+		String statsFilePathParam,  String fieldDelimParam, String attrWeightParam, String scoreThresholdParam) throws IOException {
 		idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
 		attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
 		statsManager = new NumericalAttrStatsManager(config, statsFilePathParam, ",");
@@ -88,6 +88,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		
 		//attribute weights
 		attrWeights = Utility.doubleArrayFromString(config.get(attrWeightParam), fieldDelim);
+		scoreThreshold = Double.parseDouble( config.get( scoreThresholdParam));
 	}
 	
 
@@ -110,7 +111,8 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		}
 		score /=  totalWt ;
 
-		if (realTimeDetection && score > scoreThreshold) {
+		scoreAboveThreshold = score > scoreThreshold;
+		if (realTimeDetection && scoreAboveThreshold) {
 			//write if above threshold
 			outQueue.send(entityID + " " + score);
 		}
