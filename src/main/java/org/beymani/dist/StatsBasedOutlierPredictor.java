@@ -32,6 +32,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.beymani.predictor.EsimatedAttrtibuteProbabilityBasedPredictor;
 import org.beymani.predictor.EstimatedProbabilityBasedPredictor;
 import org.beymani.predictor.ModelBasedPredictor;
 import org.beymani.predictor.RobustZscorePredictor;
@@ -80,7 +81,8 @@ public class StatsBasedOutlierPredictor  extends Configured implements Tool {
         private static final String PRED_STRATEGY_ZSCORE = "zscore";
         private static final String PRED_STRATEGY_ROBUST_ZSCORE = "robustZscore";
         private static final String PRED_STRATEGY_EST_PROB = "estimatedProbablity";
-      
+        private static final String PRED_STRATEGY_EST_ATTR_PROB = "estimatedAttributeProbablity";
+             
         protected void setup(Context context) throws IOException, InterruptedException {
         	Configuration config = context.getConfiguration();
         	fieldDelim = config.get("field.delim.out", ",");
@@ -94,6 +96,9 @@ public class StatsBasedOutlierPredictor  extends Configured implements Tool {
         				"field.delim.regex", "attr.weight",  "score.threshold");
         	} else if (predictorStartegy.equals(PRED_STRATEGY_EST_PROB)) {
         		predictor = new EstimatedProbabilityBasedPredictor(config,  "distr.file.path",   "score.threshold" );
+        	} else if (predictorStartegy.equals(PRED_STRATEGY_EST_ATTR_PROB)) {
+        		predictor = new EsimatedAttrtibuteProbabilityBasedPredictor(config,  "distr.file.path",  "attr.weight",  "score.threshold", 
+        				"field.delim.regex");
         	} else {
         		throw new IllegalArgumentException("ivalid predictor strategy");
         	}
