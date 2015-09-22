@@ -40,6 +40,7 @@ import org.beymani.predictor.ZscorePredictor;
 import org.chombo.util.Utility;
 
 /**
+ * Various stats and model based outlier predictor
  * @author pranab
  *
  */
