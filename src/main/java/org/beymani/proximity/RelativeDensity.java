@@ -92,7 +92,7 @@ public class RelativeDensity  extends Configured implements Tool {
         protected void setup(Context context) throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
            	fieldDelim = conf.get("field.delim", ",");
-           relDensityScale = context.getConfiguration().getInt("reltive.density.scale", 1000);
+           relDensityScale = context.getConfiguration().getInt("red.reltive.density.scale", 1000);
             if (conf.getBoolean("debug.on", false)) {
              	LOG.setLevel(Level.DEBUG);
              }

@@ -95,7 +95,7 @@ public class NeighborDensity  extends Configured implements Tool {
 			Configuration conf = context.getConfiguration();
            	fieldDelim = conf.get("field.delim", ",");
             fieldDelimRegex = conf.get("field.delim.regex", "\\[\\]");
-        	String densityFilePrefix = conf.get("density.file.prefix", "first");
+        	String densityFilePrefix = conf.get("ned.density.file.prefix", "first");
         	isDensitySplit = ((FileSplit)context.getInputSplit()).getPath().getName().startsWith(densityFilePrefix);
             if (conf.getBoolean("debug.on", false)) {
              	LOG.setLevel(Level.DEBUG);

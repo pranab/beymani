@@ -19,6 +19,7 @@ package org.beymani.proximity;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
@@ -134,13 +135,14 @@ public class AverageDistance extends Configured implements Tool {
          * @see org.apache.hadoop.mapreduce.Reducer#setup(org.apache.hadoop.mapreduce.Reducer.Context)
          */
         protected void setup(Context context) throws IOException, InterruptedException {
-           	fieldDelim = context.getConfiguration().get("field.delim", ",");
-            fieldDelimRegex = context.getConfiguration().get("field.delim.regex", "\\[\\]");
-        	topMatchCount = context.getConfiguration().getInt("top.match.count", 10);
-            doAverage = context.getConfiguration().getBoolean("top.match.average", true);
-            doDensity = context.getConfiguration().getBoolean("top.match.density", false);
-            doGrouping = context.getConfiguration().getBoolean("top.match.grouping", false);
-            densityScale = context.getConfiguration().getInt("top.match.density.scale", 1000000);
+        	Configuration config = context.getConfiguration();
+           	fieldDelim = config.get("field.delim", ",");
+            fieldDelimRegex = config.get("field.delim.regex", "\\[\\]");
+        	topMatchCount = config.getInt("avd.top.match.count", 10);
+            doAverage = config.getBoolean("avd.match.average", true);
+            doDensity = config.getBoolean("avd.top.match.density", false);
+            doGrouping = config.getBoolean("avd.top.match.grouping", false);
+            densityScale = config.getInt("avd.top.match.density.scale", 1000000);
                         
          }
     	

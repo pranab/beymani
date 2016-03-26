@@ -43,12 +43,12 @@ Here is a sample cct.properties
 field.delim.regex=,
 field.delim=,
 num.reducer=1
-bucket.count=1000
-same.schema.file.path=/pranab/meta/prod/prod.json
-top.match.count=10
-top.match.average=true
-top.match.density=false
-top.match.grouping=false
+sts.bucket.count=1000
+sts.same.schema.file.path=/pranab/meta/prod/prod.json
+avd.top.match.count=10
+avd.top.match.average=true
+avd.top.match.density=false
+avd.top.match.grouping=false
 
 
 
