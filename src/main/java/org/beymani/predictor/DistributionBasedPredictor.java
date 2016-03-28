@@ -109,8 +109,8 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
   		  	distrModel.put(items[0], count);
     	} 	
     	
-    	schema = Utility.getRichAttributeSchema(config, "distr.schema.file.path");
-    	scoreThreshold =  Double.parseDouble(config.get("score.threshold"));
+    	schema = Utility.getRichAttributeSchema(config, "dbp.distr.schema.file.path");
+    	scoreThreshold =  Double.parseDouble(config.get("dbp.score.threshold"));
 	}
 	
 	/**

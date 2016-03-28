@@ -97,14 +97,14 @@ public class EntropyBasedDistributionSorter extends Configured implements Tool {
 			Configuration conf = context.getConfiguration();
         	fieldDelimRegex = conf.get("field.delim.regex", "\\[\\]");
             
-        	String filePath = conf.get("histogram.schema.file.path");
+        	String filePath = conf.get("ebd.histogram.schema.file.path");
             FileSystem dfs = FileSystem.get(conf);
             Path src = new Path(filePath);
             FSDataInputStream fs = dfs.open(src);
             ObjectMapper mapper = new ObjectMapper();
             schema = mapper.readValue(fs, RichAttributeSchema.class);
-        	itemDelim = conf.get("item.delim", ",");
-        	totalItemCount = conf.getInt("total.Item.count", -1);
+        	itemDelim = conf.get("ebd.item.delim", ",");
+        	totalItemCount = conf.getInt("ebd.total.Item.count", -1);
         	if (totalItemCount == -1) {
         		throw new  IllegalStateException("max item count should be provided");
         	}
@@ -147,11 +147,11 @@ public class EntropyBasedDistributionSorter extends Configured implements Tool {
     	protected void setup(Context context) throws IOException, InterruptedException {
  			Configuration conf = context.getConfiguration();
         	fieldDelim = conf.get("field.delim", "[]");
- 			maxItemCount = conf.getInt("max.item.count", -1);
+ 			maxItemCount = conf.getInt("ebd.max.item.count", -1);
  			itemCount = 0;
-        	itemDelim = conf.get("item.delim", ",");
+        	itemDelim = conf.get("ebd.item.delim", ",");
         	filtered = maxItemCount > 0;
-        	outputEntropy = conf.getBoolean("output.entropy", false);
+        	outputEntropy = conf.getBoolean("ebd.output.entropy", false);
          }    	
        
     	protected void reduce(Tuple key, Iterable<Text> values, Context context)

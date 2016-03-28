@@ -93,7 +93,7 @@ public  class MultiVariateDistribution extends Configured implements Tool {
 			Configuration conf = context.getConfiguration();
         	fieldDelimRegex = conf.get("field.delim.regex", "\\[\\]");
             
-        	String filePath = conf.get("histogram.schema.file.path");
+        	String filePath = conf.get("mvd.histogram.schema.file.path");
             FileSystem dfs = FileSystem.get(conf);
             Path src = new Path(filePath);
             FSDataInputStream fs = dfs.open(src);
@@ -103,7 +103,7 @@ public  class MultiVariateDistribution extends Configured implements Tool {
             numFields = schema.getFields().size();
             partitionField = schema.getPartitionField();
             idField = schema.getIdField();
-            fieldOrdinals = Utility.intArrayFromString(conf.get("hist.field.ordinals"));
+            fieldOrdinals = Utility.intArrayFromString(conf.get("mvd.hist.field.ordinals"));
        }
 
         @Override
@@ -179,8 +179,8 @@ public  class MultiVariateDistribution extends Configured implements Tool {
         protected void setup(Context context) throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
         	fieldDelim = conf.get("field.delim", "[]");
-        	itemDelim = conf.get("item.delim", ",");
-        	outputCount = conf.getBoolean("output.count", false);
+        	itemDelim = conf.get("mvd.item.delim", ",");
+        	outputCount = conf.getBoolean("mvd.output.count", false);
         }    	
         
     	protected void reduce(Tuple key, Iterable<Text> values, Context context)

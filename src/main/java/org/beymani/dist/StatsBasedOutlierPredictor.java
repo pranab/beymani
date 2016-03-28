@@ -58,7 +58,7 @@ public class StatsBasedOutlierPredictor  extends Configured implements Tool {
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
-        Utility.setConfiguration(job.getConfiguration(), "chombo");
+        Utility.setConfiguration(job.getConfiguration(), "beymani");
         job.setMapperClass(StatsBasedOutlierPredictor.PredictorMapper.class);
         
         job.setOutputKeyClass(NullWritable.class);
@@ -87,19 +87,20 @@ public class StatsBasedOutlierPredictor  extends Configured implements Tool {
         protected void setup(Context context) throws IOException, InterruptedException {
         	Configuration config = context.getConfiguration();
         	fieldDelim = config.get("field.delim.out", ",");
-        	predictorStartegy = config.get("predictor.startegy", PRED_STRATEGY_ZSCORE);
+        	predictorStartegy = config.get("sbop.predictor.startegy", PRED_STRATEGY_ZSCORE);
         	
         	if (predictorStartegy.equals(PRED_STRATEGY_ZSCORE)) {
-        		predictor = new ZscorePredictor(config,  "id.field.ordinals",  "attr.list", "stats.file.path",  "field.delim.regex", 
-        				"attr.weight", "score.threshold");
+        		predictor = new ZscorePredictor(config,  "sbop.id.field.ordinals",  "sbop.attr.list", "sbop.stats.file.path",  
+        			"field.delim.regex", "sbop.attr.weight", "sbop.score.threshold");
         	} else if (predictorStartegy.equals(PRED_STRATEGY_ROBUST_ZSCORE)) {
-        		predictor = new RobustZscorePredictor(config,  "id.field.ordinals",  "attr.list", "med.stats.file.path", "mad.stats.file.path", 
-        				"field.delim.regex", "attr.weight",  "score.threshold");
+        		predictor = new RobustZscorePredictor(config,  "sbop.id.field.ordinals",  "sbop.attr.list", 
+        			"sbop.med.stats.file.path", "sbop.mad.stats.file.path", "field.delim.regex", 
+        			"sbop.attr.weight",  "sbop.score.threshold");
         	} else if (predictorStartegy.equals(PRED_STRATEGY_EST_PROB)) {
-        		predictor = new EstimatedProbabilityBasedPredictor(config,  "distr.file.path",   "score.threshold" );
+        		predictor = new EstimatedProbabilityBasedPredictor(config,  "sbop.distr.file.path",   "sbop.score.threshold" );
         	} else if (predictorStartegy.equals(PRED_STRATEGY_EST_ATTR_PROB)) {
-        		predictor = new EsimatedAttrtibuteProbabilityBasedPredictor(config,  "distr.file.path",  "attr.weight",  "score.threshold", 
-        				"field.delim.regex");
+        		predictor = new EsimatedAttrtibuteProbabilityBasedPredictor(config,  "sbop.distr.file.path",  "sbop.attr.weight",  
+        			"sbop.score.threshold", "field.delim.regex");
         	} else {
         		throw new IllegalArgumentException("ivalid predictor strategy");
         	}

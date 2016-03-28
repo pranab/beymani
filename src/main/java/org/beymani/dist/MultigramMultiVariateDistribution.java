@@ -108,7 +108,7 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
 			Configuration conf = context.getConfiguration();
         	fieldDelimRegex = conf.get("field.delim.regex", "\\[\\]");
             
-        	String filePath = conf.get("histogram.schema.file.path");
+        	String filePath = conf.get("mmvd.histogram.schema.file.path");
             FileSystem dfs = FileSystem.get(conf);
             Path src = new Path(filePath);
             FSDataInputStream fs = dfs.open(src);
@@ -118,13 +118,13 @@ public class MultigramMultiVariateDistribution extends Configured implements Too
             numFields = schema.getFields().size();
             partitionField = schema.getPartitionField();
             idField = schema.getIdField();
-            fieldOrdinals = Utility.intArrayFromString(conf.get("hist.field.ordinals"));
+            fieldOrdinals = Utility.intArrayFromString(conf.get("mmvd.hist.field.ordinals"));
             if (null != fieldOrdinals) {
             	fieldCount = fieldOrdinals.length;
             } else {
             	fieldCount = schema.getAttributeCount(true, true);
             }
-            sequenceLength = conf.getInt("sequence.length", 3);
+            sequenceLength = conf.getInt("mmvd.sequence.length", 3);
        }
 
         @Override
