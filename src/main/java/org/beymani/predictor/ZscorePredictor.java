@@ -24,7 +24,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
 import org.chombo.util.ConfigUtility;
-import org.chombo.util.NumericalAttrStatsManager;
+import org.chombo.stats.NumericalAttrStatsManager;
 import org.chombo.util.Utility;
 
 /**

@@ -2,9 +2,7 @@ target/**/*
 .settings/
 .project
 .classpath
-
 /target
-
 spark/project/project
 spark/project/target
 spark/target
@@ -12,6 +10,7 @@ spark/lib_managed
 spark/src_managed
 spark/project/boot
 spark/tmp
+project/
 .history
 spark/dist
 .DS_Store
