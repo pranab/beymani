@@ -21,8 +21,6 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
@@ -38,7 +36,6 @@ import org.chombo.util.RichAttribute;
 import org.chombo.util.RichAttributeSchema;
 import org.chombo.util.Tuple;
 import org.chombo.util.Utility;
-import org.codehaus.jackson.map.ObjectMapper;
 
 /**
  * Multivariate distribution
@@ -93,12 +90,8 @@ public  class MultiVariateDistribution extends Configured implements Tool {
 			Configuration conf = context.getConfiguration();
         	fieldDelimRegex = conf.get("field.delim.regex", "\\[\\]");
             
-        	String filePath = conf.get("mvd.histogram.schema.file.path");
-            FileSystem dfs = FileSystem.get(conf);
-            Path src = new Path(filePath);
-            FSDataInputStream fs = dfs.open(src);
-            ObjectMapper mapper = new ObjectMapper();
-            schema = mapper.readValue(fs, RichAttributeSchema.class);
+        	//schema
+            schema = Utility.getRichAttributeSchema(conf, "mvd.histogram.schema.file.path");
             
             numFields = schema.getFields().size();
             partitionField = schema.getPartitionField();
@@ -153,6 +146,9 @@ public  class MultiVariateDistribution extends Configured implements Tool {
 	        		outKey.add(keyCompSt);
 	        	} else if (field.isInteger()) {
 	        		keyCompInt = Integer.parseInt(item) /  field.getBucketWidth();
+	        		outKey.add(keyCompInt);
+	        	} else if (field.isFloat()) {
+	        		keyCompInt = ((int)Float.parseFloat(item)) /  field.getBucketWidth();
 	        		outKey.add(keyCompInt);
 	        	} else if (field.isDouble()) {
 	        		keyCompInt = ((int)Double.parseDouble(item)) /  field.getBucketWidth();
