@@ -51,12 +51,26 @@ object MultiVariateDistribution extends JobConfiguration {
 	     case None => schema.getAttributeOrdinals().map(v => v.toInt)
 	   }
 	   val fields = fieldOrdinals.map(i => schema.findAttribute(i)).filter(f => !f.isId() && !f.isPartitionAttribute())
-	   val recTotalCount = getOptionalIntParam(appConfig, "rec.totalCount")
 	   val formatPrecision = this.getIntParamOrElse(appConfig, "format.precision", 6) 
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 	   
-	   val data = sparkCntxt.textFile(inputPath)
+	   //input
+	   val data = sparkCntxt.textFile(inputPath).cache
+	   
+	   //count
+	   val recCount = 
+	   if (null == partitionField) {
+	     val count = data.count()
+	     Map("all" -> count)
+	   } else {
+	      data.map(line => {
+	       val items = line.split(fieldDelimIn)
+	       (items(0), line)
+	     }).countByKey()
+	   }
+	   
+	   //key by bucket
 	   val bucketData = data.map(line => {
 	     val items = line.split(fieldDelimIn)
 	     val len = fieldOrdinals.length + (if (null != partitionField)  1 else  0)
@@ -97,12 +111,13 @@ object MultiVariateDistribution extends JobConfiguration {
 	     val res = if (idPresent) {
 	       kv._2.getString(0)
 	     } else {
-	       recTotalCount match {
-	         case Some(count : Int) => { 
-	           val dist = kv._2.getInt(0).toFloat / count 
-	           "" + kv._2.getInt(0) + fieldDelimOut + BasicUtils.formatDouble(dist, formatPrecision) }
-	         case None => "" + kv._2.getInt(0)
+	       val partId = if (null == partitionField) "all"  else kv._1.getString(0)
+	       val count = recCount.get(partId)
+	       val dist =  count match {   
+	         case Some(rCount:Long) =>   kv._2.getInt(0).toFloat / rCount 
+	         case None => throw new IllegalStateException("missing count")
 	       }
+	       "" + kv._2.getInt(0) + fieldDelimOut + BasicUtils.formatDouble(dist, formatPrecision)
 	     }	     
 	     val bucket = kv._1.toString() 
 	     bucket + fieldDelimOut + res 
