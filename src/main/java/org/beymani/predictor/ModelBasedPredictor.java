@@ -17,19 +17,38 @@
 
 package org.beymani.predictor;
 
+import java.io.Serializable;
+
 /**
  * Base class for all model based predictors
  * @author pranab
  *
  */
-public abstract class ModelBasedPredictor {
+public abstract class ModelBasedPredictor implements Serializable {
 	protected boolean realTimeDetection;
 	protected double scoreThreshold;
 	protected boolean scoreAboveThreshold;
+	protected boolean partition = false;
 	
+	/**
+	 * @param entityID
+	 * @param record
+	 * @return
+	 */
 	public abstract double execute(String entityID, String record);
 
+	/**
+	 * @return
+	 */
 	public boolean isScoreAboveThreshold() {
 		return scoreAboveThreshold;
 	} 
+	
+	/**
+	 * @return
+	 */
+	public ModelBasedPredictor withPartition() {
+		partition = true;
+		return this;
+	}
 }

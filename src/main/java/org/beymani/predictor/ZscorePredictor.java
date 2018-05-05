@@ -70,6 +70,33 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	}
 
 	/**
+	 * @param config
+	 * @param idOrdinalsParam
+	 * @param attrListParam
+	 * @param fieldDelimParam
+	 * @param attrWeightParam
+	 * @param statsFilePathParam
+	 * @param hdfsFileParam
+	 * @param scoreThresholdParam
+	 * @throws IOException
+	 */
+	public ZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, String fieldDelimParam, 
+			String attrWeightParam, String statsFilePathParam, String hdfsFileParam, String scoreThresholdParam) 
+		throws IOException {
+		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
+		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
+		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
+		
+		String statsFilePath = ConfigUtility.getString(config, statsFilePathParam);
+		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
+		statsManager = new NumericalAttrStatsManager(statsFilePath, ",",  hdfsFilePath);
+
+		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
+		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam, 3.0);
+		realTimeDetection = true;
+	}
+	
+	/**
 	 * Hadoop MR usage for z score
 	 * @param config
 	 * @param idOrdinalsParam

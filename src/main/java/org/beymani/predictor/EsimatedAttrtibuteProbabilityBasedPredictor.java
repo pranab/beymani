@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.chombo.util.ConfigUtility;
 import org.chombo.util.RichAttribute;
 import org.chombo.util.Utility;
 
@@ -58,6 +59,27 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		requireMissingAttrValue = Boolean.parseBoolean(conf.get("require.missing.attr.value").toString());
 		realTimeDetection = true;
 	}
+	
+	/**
+	 * @param config
+	 * @param distrFilePathParam
+	 * @param attrWeightParam
+	 * @param scoreThresholdParam
+	 * @param fieldDelimParam
+	 * @throws IOException
+	 */
+	public EsimatedAttrtibuteProbabilityBasedPredictor(Map<String, Object> config, String distrFilePathParam, String attrWeightParam, 
+			String scoreThresholdParam, String fieldDelimParam) throws IOException {
+		super(config, ConfigUtility.getString(config, distrFilePathParam));
+			
+		buildAttributeWiseDistr();
+
+		//attribute weights
+		fieldDelim = ConfigUtility.getString(config, fieldDelimParam);
+		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
+		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
+	}
+	
 
 	/**
 	 * Hadoop MR usage
@@ -65,9 +87,9 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	 * @param distrFilePath
 	 * @throws IOException
 	 */
-	public EsimatedAttrtibuteProbabilityBasedPredictor(Configuration config, String distrFilePath, String attrWeightParam, 
+	public EsimatedAttrtibuteProbabilityBasedPredictor(Configuration config, String distrFilePathParam, String attrWeightParam, 
 		String scoreThresholdParam, String fieldDelimParam) throws IOException {
-		super(config, distrFilePath);
+		super(config, config.get(distrFilePathParam));
 		
 		buildAttributeWiseDistr();
 

@@ -37,6 +37,10 @@ public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredict
 		super(conf);
 		realTimeDetection = true;
 	}
+	
+	public EstimatedProbabilityBasedPredictor(Map<String, Object> config, String distrFilePath, String scoreThresholdParam) throws IOException {
+		super(config, distrFilePath);
+	}
 
 	/**
 	 * Hadoop MR usage

@@ -29,6 +29,8 @@ import java.util.Scanner;
 import org.apache.hadoop.conf.Configuration;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
+import org.chombo.util.BasicUtils;
+import org.chombo.util.ConfigUtility;
 import org.chombo.util.RichAttribute;
 import org.chombo.util.RichAttributeSchema;
 import org.chombo.util.Utility;
@@ -111,6 +113,29 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
     	
     	schema = Utility.getRichAttributeSchema(config, "dbp.distr.schema.file.path");
     	scoreThreshold =  Double.parseDouble(config.get("dbp.score.threshold"));
+	}
+	
+	/**
+	 * @param config
+	 * @param distrFilePath
+	 * @throws IOException
+	 */
+	public DistributionBasedPredictor(Map<String, Object> config, String distrFilePath) throws IOException {
+		super();
+    	InputStream fs = BasicUtils.getFileStream(ConfigUtility.getString(config, distrFilePath));
+    	BufferedReader reader = new BufferedReader(new InputStreamReader(fs));
+    	String line = null; 
+    	String[] items = null;
+		
+    	while((line = reader.readLine()) != null) {
+    		items = line.split(",");
+  		  	int count = Integer.parseInt(items[1]);
+  		  	totalCount += count;
+  		  	distrModel.put(items[0], count);
+    	} 	
+    	
+    	schema = BasicUtils.getRichAttributeSchema(ConfigUtility.getString(config, "dbp.distr.schema.file.path"));
+    	scoreThreshold = ConfigUtility.getDouble(config, "dbp.score.threshold");
 	}
 	
 	/**

@@ -53,7 +53,8 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	 * @throws IOException
 	 */
 	public RobustZscorePredictor(Map config, String idOrdinalsParam, String attrListParam, String fieldDelimParam, 
-			String attrWeightParam, String medModelKeyParam, String madModelKeyParam, String scoreThresholdParam) 
+			String attrWeightParam, String medModelKeyParam, String madModelKeyParam, String scoreThresholdParam, 
+			boolean frmCache) 
 		throws IOException {
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
@@ -74,6 +75,29 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	}
 	
 	/**
+	 * @param config
+	 * @param idOrdinalsParam
+	 * @param attrListParam
+	 * @param medFilePathParam
+	 * @param madFilePathParam
+	 * @param fieldDelimParam
+	 * @param attrWeightParam
+	 * @param scoreThresholdParam
+	 * @throws IOException
+	 */
+	public RobustZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, 
+			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam, 
+			String scoreThresholdParam) throws IOException {
+		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
+		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
+		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
+		medStatManager = new MedianStatsManager(config, medFilePathParam, madFilePathParam, fieldDelim,  idOrdinals);
+		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
+		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam, 3.0);
+	}
+		
+	
+	/**
 	 * Hadoop MR usage for robust zscore
 	 * @param config
 	 * @param idOrdinalsParam
@@ -86,16 +110,16 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	public RobustZscorePredictor(Configuration config, String idOrdinalsParam, String attrListParam, 
 			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam, 
 			String scoreThresholdParam) throws IOException {
-			idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
-			attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
-    		medStatManager = new MedianStatsManager(config, medFilePathParam, madFilePathParam,  
-        			",",  idOrdinals);
+		idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
+		attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
+    	medStatManager = new MedianStatsManager(config, medFilePathParam, madFilePathParam,  
+        		",",  idOrdinals);
 
-			fieldDelim = config.get(fieldDelimParam, ",");
+		fieldDelim = config.get(fieldDelimParam, ",");
 			
-			//attribute weights
-			attrWeights = Utility.doubleArrayFromString(config.get(attrWeightParam), fieldDelim);
-			scoreThreshold = Double.parseDouble( config.get( scoreThresholdParam));
+		//attribute weights
+		attrWeights = Utility.doubleArrayFromString(config.get(attrWeightParam), fieldDelim);
+		scoreThreshold = Double.parseDouble( config.get( scoreThresholdParam));
 	}
 
 	@Override
