@@ -82,7 +82,15 @@ object StatsBasedOutlierPredictor extends JobConfiguration {
 	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
 	     }
 	     case `predStrategyRobustZscore` => {
-	       
+	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
+	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
+	       configParams.put("attr.weights", attrWeights)
+	       val medStatsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.medFilePath", "missing med stat file path")
+	       configParams.put("stats.medFilePath", medStatsFilePath)
+	       val madStatsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.madFilePath", "missing mad stat file path")
+	       configParams.put("stats.madFilePath", madStatsFilePath)
+	       val isHdfsFile = getBooleanParamOrElse(appAlgoConfig, "hdfs.file", false)
+	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
 	     }
 	     case `predStrategyEstProb` => {
 	       

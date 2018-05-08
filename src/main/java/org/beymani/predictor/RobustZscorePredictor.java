@@ -87,11 +87,14 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	 */
 	public RobustZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, 
 			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam, 
-			String scoreThresholdParam) throws IOException {
+			String hdfsFileParam, String scoreThresholdParam) throws IOException {
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
-		medStatManager = new MedianStatsManager(config, medFilePathParam, madFilePathParam, fieldDelim,  idOrdinals);
+		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
+		String medFilePath = ConfigUtility.getString(config, medFilePathParam);
+		String madFilePath = ConfigUtility.getString(config, medFilePathParam);
+		medStatManager = new MedianStatsManager(config, medFilePath, madFilePath, fieldDelim,  idOrdinals, hdfsFilePath);
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam, 3.0);
 	}
