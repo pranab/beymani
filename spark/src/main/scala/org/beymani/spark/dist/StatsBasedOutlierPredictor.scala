@@ -24,6 +24,8 @@ import org.chombo.spark.common.Record
 import org.chombo.util.BaseAttribute
 import com.typesafe.config.Config
 import java.lang.Boolean
+import org.beymani.predictor.ZscorePredictor
+import org.beymani.predictor.RobustZscorePredictor
 
 
 object StatsBasedOutlierPredictor extends JobConfiguration {
@@ -48,7 +50,45 @@ object StatsBasedOutlierPredictor extends JobConfiguration {
 	   val fieldDelimIn = appConfig.getString("field.delim.in")
 	   val fieldDelimOut = appConfig.getString("field.delim.out")
 	   val predictorStrategy = getStringParamOrElse(appConfig, "predictor.strategy", predStrategyZscore)
+	   val appAlgoConfig = config.getConfig(predictorStrategy)
+	   val algoConfig = getConfig(predictorStrategy, appConfig, appAlgoConfig)
+	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
+	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   
+	   val debugOn = appConfig.getBoolean("debug.on")
+	   val saveOutput = appConfig.getBoolean("save.output")
+
+	   val predictor = predictorStrategy match {
+       	case `predStrategyZscore` => new ZscorePredictor(algoConfig, "partition.idOrdinals", "attr.ordinals", 
+       	    "field.delim.in", "attr.weights", "stats.filePath", "hdfs.file", "score.threshold");
+         
+       	case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "partition.idOrdinals", "attr.ordinals", 
+       	    "field.delim.in", "attr.weights", "stats.medFilePath", "stats.madFilePath", "hdfs.file", "score.threshold");
+     }
+	   
+	 //broadcast validator
+	 val brPredictor = sparkCntxt.broadcast(predictor)
+	   
+	 //input
+	 val data = sparkCntxt.textFile(inputPath)
+
+	 //apply validators to each field in each line to create RDD of tagged records
+	 val taggedData = data.map(line => {
+		   val predictor = brPredictor.value
+		   val score:java.lang.Double = predictor.execute("", line)
+		   val marker = if (score > scoreThreshold) "O"  else "N"
+		   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
+	 })
+	 
+	 if (debugOn) {
+         val records = taggedData.collect
+         records.slice(0, 100).foreach(r => println(r))
+     }
+	   
+	 if(saveOutput) {	   
+	     taggedData.saveAsTextFile(outputPath) 
+	 }	 
+	 
    }
    
       /**
@@ -67,9 +107,11 @@ object StatsBasedOutlierPredictor extends JobConfiguration {
 	   val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
 	   configParams.put("attr.ordinals", attrOrds)
 	   
-	   val fieldDelimIn = appConfig.getString("field.delim.in")
+	   val fieldDelimIn = getStringParamOrElse(appConfig, "field.delim.in", ",")
 	   configParams.put("field.delim.in", fieldDelimIn)
 
+	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
+	   configParams.put("score.threshold", scoreThreshold);
 	   
 	   predictorStrategy match {
 	     case `predStrategyZscore` => {
@@ -102,5 +144,6 @@ object StatsBasedOutlierPredictor extends JobConfiguration {
 	   
 	   configParams
    }
+   
 
 }
