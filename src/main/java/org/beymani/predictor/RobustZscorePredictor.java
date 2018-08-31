@@ -149,4 +149,24 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 		}
 		return score;
 	}
+	
+	@Override
+	public double execute(String[] items, String compKey) {
+		double score = 0;
+		int i = 0;
+		double totalWt = 0;
+		for (int ord  :  attrOrdinals) {
+			double val = Double.parseDouble(items[ord]);
+			if (null != idOrdinals) {
+				score  += (Math.abs( val - medStatManager.getKeyedMedian(compKey, ord) ) / 
+						medStatManager.getKeyedMedAbsDivergence(compKey, ord)) * attrWeights[i];
+			}	else {
+				score  += (Math.abs( val -  medStatManager.getMedian(ord)) / medStatManager.getMedAbsDivergence(ord)) * attrWeights[i];
+			}
+		}
+		score /=  totalWt ;
+		scoreAboveThreshold = score > scoreThreshold;
+		return score;
+		
+	}	
 }

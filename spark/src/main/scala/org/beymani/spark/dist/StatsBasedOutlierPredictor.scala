@@ -26,9 +26,10 @@ import com.typesafe.config.Config
 import java.lang.Boolean
 import org.beymani.predictor.ZscorePredictor
 import org.beymani.predictor.RobustZscorePredictor
+import org.chombo.util.SeasonalAnalyzer;
+import org.chombo.spark.common.SeasonalUtility
 
-
-object StatsBasedOutlierPredictor extends JobConfiguration {
+object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility {
    private val predStrategyZscore = "zscore";
    private val predStrategyRobustZscore = "robustZscore";
    private val predStrategyEstProb = "estimatedProbablity";
@@ -39,7 +40,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration {
    * @return
    */
    def main(args: Array[String]) {
-	   val appName = "multiVariateDistribution"
+	   val appName = "statsBasedOutlierPredictor"
 	   val Array(inputPath: String, outputPath: String, configFile: String) = getCommandLineArgs(args, 3)
 	   val config = createConfig(configFile)
 	   val sparkConf = createSparkConf(appName, config, false)
@@ -54,17 +55,44 @@ object StatsBasedOutlierPredictor extends JobConfiguration {
 	   val algoConfig = getConfig(predictorStrategy, appConfig, appAlgoConfig)
 	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
+	   val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
+	   val keyFieldOrdinals = keyFields match {
+	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
+	     case None => None  
+	   }
+	   
+	   //seasonal data
+	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
+	   val partBySeasonCycle = getBooleanParamOrElse(appConfig, "part.bySeasonCycle", true)
+	   val seasonalAnalyzers = if (seasonalAnalysis) {
+		   val seasonalCycleTypes = getMandatoryStringListParam(appConfig, "seasonal.cycleType", 
+	        "missing seasonal cycle type").asScala.toArray
+	        val timeZoneShiftHours = getIntParamOrElse(appConfig, "time.zoneShiftHours", 0)
+	        val timeStampFieldOrdinal = getMandatoryIntParam(appConfig, "time.fieldOrdinal", 
+	        "missing time stamp field ordinal")
+	        val timeStampInMili = getBooleanParamOrElse(appConfig, "time.inMili", true)
+	        
+	        val analyzers = seasonalCycleTypes.map(sType => {
+	    	val seasonalAnalyzer = createSeasonalAnalyzer(this, appConfig, sType, timeZoneShiftHours, timeStampInMili)
+	        seasonalAnalyzer
+	    })
+	    Some((analyzers, timeStampFieldOrdinal))
+	   } else {
+		   None
+	   }
+	   
 	   
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 
 	   val predictor = predictorStrategy match {
-       	case `predStrategyZscore` => new ZscorePredictor(algoConfig, "partition.idOrdinals", "attr.ordinals", 
-       	    "field.delim.in", "attr.weights", "stats.filePath", "hdfs.file", "score.threshold");
+       	case `predStrategyZscore` => new ZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
+       	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold");
          
        	case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "partition.idOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.medFilePath", "stats.madFilePath", "hdfs.file", "score.threshold");
      }
+	   
 	   
 	 //broadcast validator
 	 val brPredictor = sparkCntxt.broadcast(predictor)
@@ -73,9 +101,41 @@ object StatsBasedOutlierPredictor extends JobConfiguration {
 	 val data = sparkCntxt.textFile(inputPath)
 
 	 //apply validators to each field in each line to create RDD of tagged records
+	  var keyLen = 0
+	  keyFieldOrdinals match {
+	    case Some(fields : Array[Integer]) => keyLen +=  fields.length
+	    case None =>
+	  }
+	  keyLen += (if (seasonalAnalysis) 1 else 0)
+	  keyLen += (if (seasonalAnalysis && partBySeasonCycle) 1 else 0)
+	  keyLen += 2
+
 	 val taggedData = data.map(line => {
+		   val items = line.split(fieldDelimIn, -1)
+		   val key = Record(keyLen)
+		   //partioning fields
+		   keyFieldOrdinals match {
+	           case Some(fields : Array[Integer]) => {
+	             for (kf <- fields) {
+	               key.addString(items(kf))
+	             }
+	           }
+	           case None =>
+	       }
+		     
+		   //seasonality cycle
+		   seasonalAnalyzers match {
+		     case Some(seAnalyzers : (Array[SeasonalAnalyzer], Int)) => {
+		         val timeStamp = items(seAnalyzers._2).toLong
+		         val cIndex = SeasonalAnalyzer.getCycleIndex(seAnalyzers._1, timeStamp)
+		         key.addString(cIndex.getLeft())
+		         if (partBySeasonCycle) key.addInt(cIndex.getRight())
+		       }
+		     case None => 
+		   }	  
+		   val keyStr = key.toString
 		   val predictor = brPredictor.value
-		   val score:java.lang.Double = predictor.execute("", line)
+		   val score:java.lang.Double = predictor.execute(items, keyStr)
 		   val marker = if (score > scoreThreshold) "O"  else "N"
 		   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
 	 })
@@ -97,12 +157,12 @@ object StatsBasedOutlierPredictor extends JobConfiguration {
    */
    def getConfig(predictorStrategy : String, appConfig : Config,  appAlgoConfig : Config) : java.util.Map[String, Object] = {
 	   val configParams = new java.util.HashMap[String, Object]()
-	   val partIdOrds = getOptionalIntListParam(appConfig, "partitionId.ordinals");
+	   val partIdOrds = getOptionalIntListParam(appConfig, "id.fieldOrdinals");
 	   val idOrdinals = partIdOrds match {
 	     case Some(idOrdinals: java.util.List[Integer]) => BasicUtils.fromListToIntArray(idOrdinals)
 	     case None => null
 	   }
-	   configParams.put("partition.idOrdinals", idOrdinals)
+	   configParams.put("id.fieldOrdinals", idOrdinals)
 	   
 	   val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
 	   configParams.put("attr.ordinals", attrOrds)
@@ -113,12 +173,15 @@ object StatsBasedOutlierPredictor extends JobConfiguration {
 	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
 	   configParams.put("score.threshold", scoreThreshold);
 	   
+	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
+	   configParams.put("seasonal.analysis", scoreThreshold);
+	   
 	   predictorStrategy match {
 	     case `predStrategyZscore` => {
 	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
 	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
 	       configParams.put("attr.weights", attrWeights)
-	       val statsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.filePath", "missing stat file path")
+	       val statsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.file.path", "missing stat file path")
 	       configParams.put("stats.filePath", statsFilePath)
 	       val isHdfsFile = getBooleanParamOrElse(appAlgoConfig, "hdfs.file", false)
 	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))

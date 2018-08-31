@@ -239,6 +239,13 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		return score;
 	}
 	
+	@Override
+	public double execute(String[] items, String compKey) {
+		//TODO
+		double score = 0;
+		
+		return score;
+	}
 
 	/**
 	 * @param stateSeq

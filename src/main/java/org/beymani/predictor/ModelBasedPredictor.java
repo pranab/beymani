@@ -36,6 +36,14 @@ public abstract class ModelBasedPredictor implements Serializable {
 	 * @return
 	 */
 	public abstract double execute(String entityID, String record);
+	
+	/**
+	 * @param items
+	 * @param compKey
+	 * @return
+	 */
+	public abstract double execute(String[] items, String compKey);
+
 
 	/**
 	 * @return

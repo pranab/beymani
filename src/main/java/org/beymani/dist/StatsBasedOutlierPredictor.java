@@ -109,7 +109,7 @@ public class StatsBasedOutlierPredictor  extends Configured implements Tool {
         @Override
         protected void map(LongWritable key, Text value, Context context)
             throws IOException, InterruptedException {
-            double score = predictor.execute(null,  value.toString());
+            double score = predictor.execute("",  value.toString());
             
             if (predictor.isScoreAboveThreshold()) {
             	outVal.set(value.toString() + fieldDelim + score);

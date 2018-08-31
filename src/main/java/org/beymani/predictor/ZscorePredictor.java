@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
+import org.chombo.util.BasicUtils;
 import org.chombo.util.ConfigUtility;
 import org.chombo.stats.NumericalAttrStatsManager;
 import org.chombo.util.Utility;
@@ -37,6 +38,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	private NumericalAttrStatsManager statsManager;
 	private String fieldDelim;
 	private double[] attrWeights;
+	private boolean seasonal;
 	protected MessageQueue outQueue;
 	protected Cache cache;
 	
@@ -81,7 +83,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	 * @throws IOException
 	 */
 	public ZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, String fieldDelimParam, 
-			String attrWeightParam, String statsFilePathParam, String hdfsFileParam, String scoreThresholdParam) 
+			String attrWeightParam, String statsFilePathParam, String seasonalParam,String hdfsFileParam, String scoreThresholdParam) 
 		throws IOException {
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
@@ -89,8 +91,13 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		
 		String statsFilePath = ConfigUtility.getString(config, statsFilePathParam);
 		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
-		statsManager = new NumericalAttrStatsManager(statsFilePath, ",",  hdfsFilePath);
-
+		seasonal = ConfigUtility.getBoolean(config, seasonalParam);
+		
+		if (null != idOrdinals) {
+			statsManager =  new NumericalAttrStatsManager(statsFilePath, ",",idOrdinals,  seasonal, hdfsFilePath);
+		} else {
+			statsManager = new NumericalAttrStatsManager(statsFilePath, ",",  hdfsFilePath);
+		}
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam, 3.0);
 		realTimeDetection = true;
@@ -128,7 +135,10 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		for (int ord  :  attrOrdinals) {
 			double val = Double.parseDouble(items[ord]);
 			if (null != idOrdinals) {
-				String compKey = Utility.join(items, idOrdinals, fieldDelim);
+				String compKey = BasicUtils.join(items, idOrdinals, fieldDelim);
+				if (seasonal) {
+					
+				}
 				score  += (Math.abs( val -  statsManager.getMean(compKey,ord)) / statsManager.getStdDev(compKey, ord)) * attrWeights[i];
 			} else {
 				score  += (Math.abs( val -  statsManager.getMean(ord)) / statsManager.getStdDev(ord)) * attrWeights[i];
@@ -143,6 +153,27 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 			//write if above threshold
 			outQueue.send(entityID + " " + score);
 		}
+		return score;
+	}
+
+	@Override
+	public double execute(String[] items, String compKey) {
+		double score = 0;
+		int i = 0;
+		double totalWt = 0;
+		for (int ord  :  attrOrdinals) {
+			double val = Double.parseDouble(items[ord]);
+			if (null != idOrdinals) {
+				score  += (Math.abs( val - statsManager.getMean(compKey,ord)) / statsManager.getStdDev(compKey, ord)) * attrWeights[i];
+			} else {
+				score  += (Math.abs( val - statsManager.getMean(ord)) / statsManager.getStdDev(ord)) * attrWeights[i];
+			}
+			totalWt += attrWeights[i];
+			++i;
+		}
+		score /=  totalWt ;
+
+		scoreAboveThreshold = score > scoreThreshold;
 		return score;
 	}
 
