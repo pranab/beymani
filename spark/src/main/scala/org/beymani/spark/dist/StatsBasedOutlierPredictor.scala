@@ -90,7 +90,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold");
          
        	case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "partition.idOrdinals", "attr.ordinals", 
-       	    "field.delim.in", "attr.weights", "stats.medFilePath", "stats.madFilePath", "hdfs.file", "score.threshold");
+       	    "field.delim.in", "attr.weights", "stats.medFilePath", "stats.madFilePath", "seasonal.analysis","hdfs.file", "score.threshold");
      }
 	   
 	   

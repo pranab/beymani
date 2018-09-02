@@ -87,14 +87,16 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	 */
 	public RobustZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, 
 			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam, 
-			String hdfsFileParam, String scoreThresholdParam) throws IOException {
+			String seasonalParam, String hdfsFileParam, String scoreThresholdParam) throws IOException {
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
 		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
 		String medFilePath = ConfigUtility.getString(config, medFilePathParam);
 		String madFilePath = ConfigUtility.getString(config, medFilePathParam);
-		medStatManager = new MedianStatsManager(config, medFilePath, madFilePath, fieldDelim,  idOrdinals, hdfsFilePath);
+		boolean seasonal = ConfigUtility.getBoolean(config, seasonalParam);
+		medStatManager = new MedianStatsManager(config, medFilePath, madFilePath, fieldDelim,  idOrdinals, hdfsFilePath,  seasonal);
+		
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam, 3.0);
 	}
@@ -112,11 +114,11 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	 */
 	public RobustZscorePredictor(Configuration config, String idOrdinalsParam, String attrListParam, 
 			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam, 
-			String scoreThresholdParam) throws IOException {
+			String scoreThresholdParam, boolean seasonal) throws IOException {
 		idOrdinals = Utility.intArrayFromString(config.get(idOrdinalsParam));
 		attrOrdinals = Utility.intArrayFromString(config.get(attrListParam));
     	medStatManager = new MedianStatsManager(config, medFilePathParam, madFilePathParam,  
-        		",",  idOrdinals);
+        		",",  idOrdinals,  seasonal);
 
 		fieldDelim = config.get(fieldDelimParam, ",");
 			
