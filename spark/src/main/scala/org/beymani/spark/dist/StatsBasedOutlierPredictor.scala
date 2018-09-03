@@ -51,7 +51,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val fieldDelimIn = appConfig.getString("field.delim.in")
 	   val fieldDelimOut = appConfig.getString("field.delim.out")
 	   val predictorStrategy = getStringParamOrElse(appConfig, "predictor.strategy", predStrategyZscore)
-	   val appAlgoConfig = config.getConfig(predictorStrategy)
+	   val appAlgoConfig = appConfig.getConfig(predictorStrategy)
 	   val algoConfig = getConfig(predictorStrategy, appConfig, appAlgoConfig)
 	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
@@ -60,6 +60,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
 	     case None => None  
 	   }
+	   val outputOutliers = getBooleanParamOrElse(appConfig, "output.outliers", false)
 	   
 	   //seasonal data
 	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
@@ -108,9 +109,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	  }
 	  keyLen += (if (seasonalAnalysis) 1 else 0)
 	  keyLen += (if (seasonalAnalysis && partBySeasonCycle) 1 else 0)
-	  keyLen += 2
 
-	 val taggedData = data.map(line => {
+	 var taggedData = data.map(line => {
 		   val items = line.split(fieldDelimIn, -1)
 		   val key = Record(keyLen)
 		   //partioning fields
@@ -140,6 +140,14 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 		   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
 	 })
 	 
+	 if (outputOutliers) {
+	   taggedData = taggedData.filter(line => {
+		   val items = line.split(fieldDelimIn, -1)
+		   val marker = items(items.length - 1)
+		   marker.equals("O")
+	   })
+	 } 
+	  
 	 if (debugOn) {
          val records = taggedData.collect
          records.slice(0, 100).foreach(r => println(r))
@@ -173,8 +181,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
 	   configParams.put("score.threshold", scoreThreshold);
 	   
-	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
-	   configParams.put("seasonal.analysis", scoreThreshold);
+	   val seasonalAnalysis:java.lang.Boolean = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
+	   configParams.put("seasonal.analysis", seasonalAnalysis);
 	   
 	   predictorStrategy match {
 	     case `predStrategyZscore` => {

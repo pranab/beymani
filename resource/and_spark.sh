@@ -17,7 +17,20 @@ case "$1" in
 	--conf spark.ui.killEnabled=true --master $MASTER $CHOMBO_JAR_NAME  $INPUT $OUTPUT and.conf
 ;;
 
+"createStatsFile")
+	cat $PROJECT_HOME/bin/beymani/output/nas/part-00000 > $PROJECT_HOME/bin/beymani/other/olp/stats.txt
+	cat $PROJECT_HOME/bin/beymani/output/nas/part-00001 >> $PROJECT_HOME/bin/beymani/other/olp/stats.txt
+;;
 
+"olPred")
+	echo "running StatsBasedOutlierPredictor"
+	CLASS_NAME=org.beymani.spark.dist.StatsBasedOutlierPredictor
+	INPUT=file:///Users/pranab/Projects/bin/beymani/input/olp/cusage.txt
+	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/olp
+	rm -rf ./output/olp
+	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
+	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT and.conf
+;;
 
 *) 
 	echo "unknown operation $1"

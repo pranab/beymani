@@ -161,6 +161,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		double score = 0;
 		int i = 0;
 		double totalWt = 0;
+		System.out.println("execute compKey " + compKey);
 		for (int ord  :  attrOrdinals) {
 			double val = Double.parseDouble(items[ord]);
 			if (null != idOrdinals) {
