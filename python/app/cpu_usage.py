@@ -58,8 +58,12 @@ elif op == "anomaly":
 	fileName = sys.argv[2]
 	count = 0
 	for rec in fileRecGen(fileName, ","):
-		if isEventSampled(10):
-			rec[3] = str(randint(98, 100))
+		if isEventSampled(8):
+			dow = int(rec[2])
+			if dow < 5:
+				rec[3] = str(randint(94, 100))
+			else:
+				rec[3] = str(randint(54, 100))
 			count += 1
 		mrec = ",".join(rec)
 		print mrec

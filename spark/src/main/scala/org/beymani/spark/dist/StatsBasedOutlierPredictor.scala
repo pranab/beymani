@@ -61,6 +61,10 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     case None => None  
 	   }
 	   val outputOutliers = getBooleanParamOrElse(appConfig, "output.outliers", false)
+	   val remOutliers = getBooleanParamOrElse(appConfig, "rem.outliers", false)
+	   val cleanDataDirPath = getConditionalMandatoryStringParam(remOutliers, appConfig, "clean.dataDirPath", 
+	       "missing clean data file output directory")
+	   
 	   
 	   //seasonal data
 	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
@@ -100,8 +104,10 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   
 	 //input
 	 val data = sparkCntxt.textFile(inputPath)
-
-	 //apply validators to each field in each line to create RDD of tagged records
+	 if (remOutliers)
+	   data.cache
+	   
+	 //predict for each field in each line whether it's an outlier
 	  var keyLen = 0
 	  keyFieldOrdinals match {
 	    case Some(fields : Array[Integer]) => keyLen +=  fields.length
@@ -140,12 +146,23 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 		   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
 	 })
 	 
-	 if (outputOutliers) {
+	 if (outputOutliers || remOutliers) {
 	   taggedData = taggedData.filter(line => {
 		   val items = line.split(fieldDelimIn, -1)
 		   val marker = items(items.length - 1)
 		   marker.equals("O")
 	   })
+	   if (remOutliers) {
+	     taggedData = taggedData.map(line => {
+		   val items = line.split(fieldDelimIn, -1)
+	       val ar = items.slice(0, items.length - 2)
+	       ar.mkString(fieldDelimOut)
+	     })
+	     
+	     //remove outliers records
+	     val cleanData =  data.subtract(taggedData)
+	     cleanData.saveAsTextFile(cleanDataDirPath) 
+	   }
 	 } 
 	  
 	 if (debugOn) {
