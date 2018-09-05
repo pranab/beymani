@@ -1,0 +1,22 @@
+Build all necessary jars
+========================
+chombo
+mvn install
+sbt publishLocal
+
+chombo/spark
+sbt package
+sbt publishLocal
+
+beymani
+mvn install
+sbt publishLocal
+
+beymani/spark
+sbt package
+
+Build uber jar
+==============
+ant -f beymani_spark.xml
+
+uber jar file name is uber-beymani-spark-1.0.jar

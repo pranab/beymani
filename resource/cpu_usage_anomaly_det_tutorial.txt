@@ -1,0 +1,93 @@
+This tutorial is for anaomaly detection in CPU usage data using statistical modeling. To ne more specidfic
+we will be using a z score based technique
+ 
+
+Environment
+===========
+Path etc shown here corresposnds to my environment. Please Change them  as needed  for your 
+environment
+
+Build
+=====
+Follow instructions in spark_dependency.txt
+
+Create base normal data
+=======================
+./and_spark.sh crInput <num_of_days> <reading_intervaL> <num_servers> <output_file>
+
+where
+num_of_days = number of days e.g 10
+reading_intervaL = reading interval in sec e.g. 300
+num_servers = number of servers e.g. 4
+output_file = output file, we will use c.txt from now on
+
+Copy modeling data
+==================
+- insert outliers
+./and_spark.sh insOutliers <normal_data_file> <with_outlier_data_file> 
+
+where
+normal_data_file = normal data file (c.txt)
+with_outlier_data_file = data file with outliers (cusage.txt)
+
+-copy
+./and_spark.sh cpModData <with_outlier_data_file> 
+
+where
+with_outlier_data_file = data file with outliers (cusage.txt)
+
+Run Spark job for stats
+=======================
+./and_spark.sh numStat
+
+Copy and consolidate stats file
+===============================
+./and_spark.sh crStatsFile
+
+Run Spark job to detect outliers
+================================
+Set output.outliers = true and rem.outliers = true
+
+./and_spark.sh olPred
+
+Copy and consolidate clean file
+===============================
+./and_spark.sh crCleanFile
+
+Copy test data
+==============
+- insert outliers
+./and_spark.sh insOutliers <normal_data_file> <with_outlier_data_file> 
+
+where
+normal_data_file = normal data file (c.txt)
+with_outlier_data_file = data file with outliers (cusage.txt)
+
+-copy
+./and_spark.sh cpTestData <with_outlier_data_file> 
+
+where
+with_outlier_data_file = data file with outliers (cusage.txt)
+
+
+Run Spark job for stats again with clean data
+=============================================
+./and_spark.sh numStat
+
+Copy and consolidate stats file
+===============================
+./and_spark.sh crStatsFile
+
+
+Run Spark job to detect outliers
+================================
+Set output.outliers = true and rem.outliers = true
+
+./and_spark.sh olPred
+
+Configuration
+=============
+Configuration is in and.conf. Make changes as necessary
+
+
+
