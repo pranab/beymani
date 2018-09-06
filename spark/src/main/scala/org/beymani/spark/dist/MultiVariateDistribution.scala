@@ -43,7 +43,13 @@ object MultiVariateDistribution extends JobConfiguration {
 	   val shemaFilePath = this.getMandatoryStringParam(appConfig, "schema.filePath")
 	   val schema = BasicUtils.getRichAttributeSchema(shemaFilePath)
        val numFields = schema.getFields().size()
-       val partitionField = schema.getPartitionField()
+       //val partitionField = schema.getPartitionField()
+       val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
+	   val keyFieldOrdinals = keyFields match {
+	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
+	     case None => None  
+	   }
+
        val idField = schema.getIdField()
        val idPresent = null != idField
 	   val fieldOrdinals = getOptionalIntListParam(appConfig, "dist.fieldOrdinals") match {
@@ -59,23 +65,52 @@ object MultiVariateDistribution extends JobConfiguration {
 	   val data = sparkCntxt.textFile(inputPath).cache
 	   
 	   //count
-	   val recCount = 
-	   if (null == partitionField) {
-	     val count = data.count()
-	     Map("all" -> count)
-	   } else {
-	      data.map(line => {
-	       val items = line.split(fieldDelimIn)
-	       (items(0), line)
-	     }).countByKey()
+	   val  recCount = keyFieldOrdinals match {
+	     case Some(ordinals : Array[Integer]) => {
+	       val count = data.map(line => {
+	    	   val keyLen =  ordinals.length
+	    	   val key = Record(keyLen)
+	           val items = line.split(fieldDelimIn)
+	           for (kf <- ordinals) {
+	               key.addString(items(kf))
+	           }
+
+	           (key.toString, line)
+	       }).countByKey()
+	       count
+	     }
+	     case None => {	    
+	       val count = data.count()
+	       Map("all" -> count)
+	     }
 	   }
+	   
 	   
 	   //key by bucket
 	   val bucketData = data.map(line => {
 	     val items = line.split(fieldDelimIn)
-	     val len = fieldOrdinals.length + (if (null != partitionField)  1 else  0)
+	     //var len = fieldOrdinals.length + (if (null != partitionField)  1 else  0)
+	     
+	     var len = fieldOrdinals.length
+	     len += (
+	         keyFieldOrdinals match {
+	         	case Some(ordinals : Array[Integer]) => ordinals.length
+	         	case None => 0
+	         }
+	     )
+	     
 	     val bucket = Record(len)
-	     if (null != partitionField) bucket.addString(items(partitionField.getOrdinal()))
+	     keyFieldOrdinals match {
+	      case Some(ordinals : Array[Integer]) => {
+	        val count = data.map(line => {
+	           for (kf <- ordinals) {
+	               bucket.addString(items(kf))
+	           }
+	        })
+	      }
+	      case None => 
+	    }
+	     
 	     fields.foreach(f => {
 	       f.getDataType() match {
 	         case BaseAttribute.DATA_TYPE_STRING => {
@@ -111,7 +146,15 @@ object MultiVariateDistribution extends JobConfiguration {
 	     val res = if (idPresent) {
 	       kv._2.getString(0)
 	     } else {
-	       val partId = if (null == partitionField) "all"  else kv._1.getString(0)
+	       val partId = keyFieldOrdinals match {
+	       		case Some(ordinals : Array[Integer]) => {
+	       		  kv._1.toString(0, ordinals.length)
+	       		}
+	       		case None => {	    
+	       			"all" 
+	       		}
+	       }	       
+	       
 	       val count = recCount.get(partId)
 	       val dist =  count match {   
 	         case Some(rCount:Long) =>   kv._2.getInt(0).toFloat / rCount 
@@ -119,7 +162,17 @@ object MultiVariateDistribution extends JobConfiguration {
 	       }
 	       "" + kv._2.getInt(0) + fieldDelimOut + BasicUtils.formatDouble(dist, formatPrecision)
 	     }	     
-	     val bucket = kv._1.toString() 
+	     val bucket = keyFieldOrdinals match {
+       		case Some(ordinals : Array[Integer]) => {
+       		  val key = kv._1.toString(0, ordinals.length)
+       		  val bucket = kv._1.toString(ordinals.length, kv._1.size, ":")
+       		  key + fieldDelimOut + bucket
+       		}
+       		case None => {	    
+       			kv._1.toString(":")
+       		}
+	     }	       
+	     
 	     bucket + fieldDelimOut + res 
 	   })
 	   
