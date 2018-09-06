@@ -26,8 +26,9 @@ import com.typesafe.config.Config
 import java.lang.Boolean
 import org.beymani.predictor.ZscorePredictor
 import org.beymani.predictor.RobustZscorePredictor
-import org.chombo.util.SeasonalAnalyzer;
+import org.chombo.util.SeasonalAnalyzer
 import org.chombo.spark.common.SeasonalUtility
+import org.beymani.predictor.EstimatedProbabilityBasedPredictor
 
 object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility {
    private val predStrategyZscore = "zscore";
@@ -94,9 +95,12 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	case `predStrategyZscore` => new ZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold");
          
-       	case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "partition.idOrdinals", "attr.ordinals", 
+       	case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.medFilePath", "stats.madFilePath", "seasonal.analysis","hdfs.file", "score.threshold");
-     }
+     
+       	case `predStrategyEstProb` => new EstimatedProbabilityBasedPredictor(algoConfig, "id.fieldOrdinals", 
+       	     "distr.file.path", "hdfs.file", "schema.file.path", "score.threshold")
+	   }
 	   
 	   
 	 //broadcast validator
@@ -223,7 +227,12 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
 	     }
 	     case `predStrategyEstProb` => {
-	       
+	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
+	       configParams.put("distr.filePath", distrFilePath)
+	       val isHdfsFile = getBooleanParamOrElse(appAlgoConfig, "hdfs.file", false)
+	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
+	       val schemaFilePath = getMandatoryStringParam(appAlgoConfig, "schema.file.path", "missing schema file path")
+	       configParams.put("schema.filePath", schemaFilePath)
 	     }
 	     case `predStrategyEstAttrProb` => {
 	       

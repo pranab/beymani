@@ -38,8 +38,17 @@ public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredict
 		realTimeDetection = true;
 	}
 	
-	public EstimatedProbabilityBasedPredictor(Map<String, Object> config, String distrFilePath, String scoreThresholdParam) throws IOException {
-		super(config, distrFilePath);
+	/**
+	 * @param config
+	 * @param distrFilePathParam
+	 * @param hdfsFileParam
+	 * @param schemaFilePathParam
+	 * @param scoreThresholdParam
+	 * @throws IOException
+	 */
+	public EstimatedProbabilityBasedPredictor(Map<String, Object> config, String idOrdinalsParam, String distrFilePathParam, String hdfsFileParam, 
+			String schemaFilePathParam, String scoreThresholdParam) throws IOException {
+		super(config, idOrdinalsParam, distrFilePathParam, hdfsFileParam, schemaFilePathParam, scoreThresholdParam);
 	}
 
 	/**
@@ -69,9 +78,12 @@ public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredict
 	
 	@Override
 	public double execute(String[] items, String compKey) {
-		//TODO
-		double score = 0;
-		
+		String bucketKey = getBucketKey(items);
+		Map<String, Integer> distrModel = keyedDistrModel.get(compKey);
+		Integer count = distrModel.get(bucketKey);
+		int totalCount = totalCounts.get(compKey);
+		double pr = null != count ? (((double)count) / totalCount) : 0;
+		double score = 1.0 - pr;
 		return score;
 	}
 }

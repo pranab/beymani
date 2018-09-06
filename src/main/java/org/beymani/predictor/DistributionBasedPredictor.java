@@ -45,8 +45,11 @@ import org.codehaus.jackson.map.ObjectMapper;
 public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected MessageQueue outQueue;
 	protected Cache cache;
+	private int[] idOrdinals;
 	protected Map<String, Integer> distrModel = new HashMap<String, Integer>();
+	protected Map<String, Map<String, Integer>> keyedDistrModel = new HashMap<String, Map<String, Integer>>();
 	protected int totalCount;
+	protected Map<String, Integer> totalCounts = new HashMap<String, Integer>();
 	protected RichAttributeSchema schema;
 	protected StringBuilder stBld = new StringBuilder();
 	protected String subFieldDelim = ";";
@@ -120,22 +123,52 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	 * @param distrFilePath
 	 * @throws IOException
 	 */
-	public DistributionBasedPredictor(Map<String, Object> config, String distrFilePath) throws IOException {
+	public DistributionBasedPredictor(Map<String, Object> config, String idOrdinalsParam, String distrFilePathParam, String hdfsFileParam, 
+			String schemaFilePathParam, String scoreThresholdParam) throws IOException {
 		super();
-    	InputStream fs = BasicUtils.getFileStream(ConfigUtility.getString(config, distrFilePath));
+		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
+		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
+		String filePath = ConfigUtility.getString(config, distrFilePathParam);
+		InputStream fs = null;
+		if (hdfsFilePath) {
+			fs = Utility.getFileStream(filePath);
+		} else {
+			fs = BasicUtils.getFileStream(filePath);
+		}
+
     	BufferedReader reader = new BufferedReader(new InputStreamReader(fs));
     	String line = null; 
     	String[] items = null;
-		
+    	String compKey = null;
+    	
     	while((line = reader.readLine()) != null) {
     		items = line.split(",");
-  		  	int count = Integer.parseInt(items[1]);
-  		  	totalCount += count;
-  		  	distrModel.put(items[0], count);
+    		int i = 0;
+    		if (null != idOrdinals) {
+    			compKey = BasicUtils.join(items, 0, idOrdinals.length);
+    			i += idOrdinals.length;
+    		}
+    		String bucket = items[i++];
+  		  	int count = Integer.parseInt(items[i++]);
+  		  	
+    		if (null != idOrdinals) {
+    			Map<String, Integer> distrModel = keyedDistrModel.get(compKey);
+    			if (null == distrModel) {
+    				distrModel = new HashMap<String, Integer>();
+    				keyedDistrModel.put(compKey, distrModel);
+    				totalCounts.put(compKey, 0);
+    			}
+    			distrModel.put(bucket, count);
+    			totalCounts.put(compKey, totalCounts.get(compKey) + count);
+    		} else {  		  	
+  		  		totalCount += count;
+  		  		distrModel.put(bucket, count);
+    		}
     	} 	
     	
-    	schema = BasicUtils.getRichAttributeSchema(ConfigUtility.getString(config, "dbp.distr.schema.file.path"));
-    	scoreThreshold = ConfigUtility.getDouble(config, "dbp.score.threshold");
+    	String schemFilePath = ConfigUtility.getString(config, schemaFilePathParam);
+    	schema = BasicUtils.getRichAttributeSchema(schemFilePath);
+    	scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 	}
 	
 	/**
@@ -144,7 +177,14 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	 */
 	protected String getBucketKey(String record) {
 		String[] items = record.split(",");
-		
+		return getBucketKey(items);
+	}
+	
+	/**
+	 * @param items
+	 * @return
+	 */
+	protected String getBucketKey(String[] items) {
 		stBld.delete(0, stBld.length());
 		String bucketElement = null;
 		for (RichAttribute field : schema.getFields()) {
@@ -161,4 +201,5 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 		stBld.delete(stBld.length()-1, stBld.length());
 		return stBld.toString();
 	}
+	
 }
