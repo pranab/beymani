@@ -39,6 +39,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	private String fieldDelim;
 	private double[] attrWeights;
 	private boolean seasonal;
+	private double expConst;
 	protected MessageQueue outQueue;
 	protected Cache cache;
 	
@@ -83,7 +84,8 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	 * @throws IOException
 	 */
 	public ZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, String fieldDelimParam, 
-			String attrWeightParam, String statsFilePathParam, String seasonalParam,String hdfsFileParam, String scoreThresholdParam) 
+			String attrWeightParam, String statsFilePathParam, String seasonalParam,String hdfsFileParam, 
+			String scoreThresholdParam, String expConstParam) 
 		throws IOException {
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
@@ -99,8 +101,9 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 			statsManager = new NumericalAttrStatsManager(statsFilePath, ",",  hdfsFilePath);
 		}
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
-		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam, 3.0);
+		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 		realTimeDetection = true;
+		expConst = ConfigUtility.getDouble(config, expConstParam);
 	}
 	
 	/**
@@ -173,6 +176,9 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 			++i;
 		}
 		score /=  totalWt ;
+		
+		//exponential normalization
+		score = BasicUtils.expSacle(expConst, score);
 
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;

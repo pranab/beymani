@@ -118,6 +118,34 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
     	scoreThreshold =  Double.parseDouble(config.get("dbp.score.threshold"));
 	}
 	
+	public DistributionBasedPredictor(Map<String, Object> config, String distrFilePathParam, String hdfsFileParam,
+			String schemaFilePathParam, String scoreThresholdParam) throws IOException {
+		super();
+		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
+		String filePath = ConfigUtility.getString(config, distrFilePathParam);
+		InputStream fs = null;
+		if (hdfsFilePath) {
+			fs = Utility.getFileStream(filePath);
+		} else {
+			fs = BasicUtils.getFileStream(filePath);
+		}
+
+		BufferedReader reader = new BufferedReader(new InputStreamReader(fs));
+    	String line = null; 
+    	String[] items = null;
+		
+    	while((line = reader.readLine()) != null) {
+    		items = line.split(",");
+  		  	int count = Integer.parseInt(items[1]);
+  		  	totalCount += count;
+  		  	distrModel.put(items[0], count);
+    	} 	
+ 
+       	String schemFilePath = ConfigUtility.getString(config, schemaFilePathParam);
+    	schema = BasicUtils.getRichAttributeSchema(schemFilePath);
+    	scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
+	}
+
 	/**
 	 * @param config
 	 * @param distrFilePath

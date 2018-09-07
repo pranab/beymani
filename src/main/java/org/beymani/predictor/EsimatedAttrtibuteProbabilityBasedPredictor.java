@@ -63,14 +63,17 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	/**
 	 * @param config
 	 * @param distrFilePathParam
+	 * @param hdfsFileParam
+	 * @param schemaFilePathParam
 	 * @param attrWeightParam
 	 * @param scoreThresholdParam
 	 * @param fieldDelimParam
 	 * @throws IOException
 	 */
-	public EsimatedAttrtibuteProbabilityBasedPredictor(Map<String, Object> config, String distrFilePathParam, String attrWeightParam, 
-			String scoreThresholdParam, String fieldDelimParam) throws IOException {
-		super(config, ConfigUtility.getString(config, distrFilePathParam));
+	public EsimatedAttrtibuteProbabilityBasedPredictor(Map<String, Object> config, String distrFilePathParam, 
+			String hdfsFileParam, String schemaFilePathParam,String attrWeightParam, String scoreThresholdParam, 
+			String fieldDelimParam) throws IOException {
+		super(config,  distrFilePathParam,  hdfsFileParam,schemaFilePathParam, scoreThresholdParam);
 			
 		buildAttributeWiseDistr();
 

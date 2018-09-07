@@ -95,7 +95,7 @@ public class StatsBasedOutlierPredictor  extends Configured implements Tool {
         	} else if (predictorStartegy.equals(PRED_STRATEGY_ROBUST_ZSCORE)) {
         		predictor = new RobustZscorePredictor(config,  "sbop.id.field.ordinals",  "sbop.attr.list", 
         			"sbop.med.stats.file.path", "sbop.mad.stats.file.path", "field.delim.regex", 
-        			"sbop.attr.weight",  "sbop.score.threshold");
+        			"sbop.attr.weight",  "sbop.score.threshold", false);
         	} else if (predictorStartegy.equals(PRED_STRATEGY_EST_PROB)) {
         		predictor = new EstimatedProbabilityBasedPredictor(config,  "sbop.distr.file.path",   "sbop.score.threshold" );
         	} else if (predictorStartegy.equals(PRED_STRATEGY_EST_ATTR_PROB)) {

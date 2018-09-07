@@ -93,7 +93,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 
 	   val predictor = predictorStrategy match {
        	case `predStrategyZscore` => new ZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
-       	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold");
+       	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold",
+       	    "exp.const");
          
        	case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.medFilePath", "stats.madFilePath", "seasonal.analysis","hdfs.file", "score.threshold");
@@ -204,6 +205,9 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   
 	   val seasonalAnalysis:java.lang.Boolean = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
 	   configParams.put("seasonal.analysis", seasonalAnalysis);
+	   
+	   val expConst :java.lang.Double = getDoubleParamOrElse(appConfig, "exp.const", 1.0)
+	   configParams.put("exp.const", expConst);
 	   
 	   predictorStrategy match {
 	     case `predStrategyZscore` => {
