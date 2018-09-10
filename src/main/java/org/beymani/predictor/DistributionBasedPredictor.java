@@ -45,7 +45,6 @@ import org.codehaus.jackson.map.ObjectMapper;
 public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected MessageQueue outQueue;
 	protected Cache cache;
-	private int[] idOrdinals;
 	protected Map<String, Integer> distrModel = new HashMap<String, Integer>();
 	protected Map<String, Map<String, Integer>> keyedDistrModel = new HashMap<String, Map<String, Integer>>();
 	protected int totalCount;

@@ -29,7 +29,9 @@ public abstract class ModelBasedPredictor implements Serializable {
 	protected double scoreThreshold;
 	protected boolean scoreAboveThreshold;
 	protected boolean partition = false;
-	
+	protected  double expConst;
+	protected int[] idOrdinals;
+
 	/**
 	 * @param entityID
 	 * @param record

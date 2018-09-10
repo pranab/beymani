@@ -33,13 +33,11 @@ import org.chombo.util.Utility;
  *
  */
 public class ZscorePredictor  extends ModelBasedPredictor{
-	private int[] idOrdinals;
 	private int[] attrOrdinals;
 	private NumericalAttrStatsManager statsManager;
 	private String fieldDelim;
 	private double[] attrWeights;
 	private boolean seasonal;
-	private double expConst;
 	protected MessageQueue outQueue;
 	protected Cache cache;
 	
@@ -178,7 +176,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		score /=  totalWt ;
 		
 		//exponential normalization
-		score = BasicUtils.expSacle(expConst, score);
+		score = BasicUtils.expScale(expConst, score);
 
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;

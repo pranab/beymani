@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
+import org.chombo.util.BasicUtils;
 import org.chombo.util.ConfigUtility;
 import org.chombo.stats.MedianStatsManager;
 import org.chombo.util.Utility;
@@ -32,7 +33,6 @@ import org.chombo.util.Utility;
  *
  */
 public class RobustZscorePredictor extends ModelBasedPredictor {
-	private int[] idOrdinals;
 	private int[] attrOrdinals;
     private MedianStatsManager medStatManager;
 	private String fieldDelim;
@@ -87,7 +87,7 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	 */
 	public RobustZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, 
 			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam, 
-			String seasonalParam, String hdfsFileParam, String scoreThresholdParam) throws IOException {
+			String seasonalParam, String hdfsFileParam, String expConstParam, String scoreThresholdParam) throws IOException {
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
@@ -98,7 +98,8 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 		medStatManager = new MedianStatsManager(config, medFilePath, madFilePath, fieldDelim,  idOrdinals, hdfsFilePath,  seasonal);
 		
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
-		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam, 3.0);
+		expConst = ConfigUtility.getDouble(config, expConstParam);
+		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 	}
 		
 	
@@ -167,6 +168,10 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 			}
 		}
 		score /=  totalWt ;
+		
+		//exponential normalization
+		score = BasicUtils.expScale(expConst, score);
+
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;
 		
