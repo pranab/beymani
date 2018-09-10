@@ -23,8 +23,9 @@ import scala.collection.JavaConverters._
 import org.chombo.util.BasicUtils
 import org.chombo.spark.common.Record
 import org.chombo.util.BaseAttribute
+import org.chombo.spark.common.SeasonalUtility
 
-object MultiVariateDistribution extends JobConfiguration {
+object MultiVariateDistribution extends JobConfiguration with SeasonalUtility {
    /**
    * @param args
    * @return
@@ -60,6 +61,26 @@ object MultiVariateDistribution extends JobConfiguration {
 	   val formatPrecision = this.getIntParamOrElse(appConfig, "format.precision", 6) 
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
+
+	   //seasonal data
+	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
+	   val partBySeasonCycle = getBooleanParamOrElse(appConfig, "part.bySeasonCycle", true)
+	   val seasonalAnalyzers = if (seasonalAnalysis) {
+		   val seasonalCycleTypes = getMandatoryStringListParam(appConfig, "seasonal.cycleType", 
+	        "missing seasonal cycle type").asScala.toArray
+	        val timeZoneShiftHours = getIntParamOrElse(appConfig, "time.zoneShiftHours", 0)
+	        val timeStampFieldOrdinal = getMandatoryIntParam(appConfig, "time.fieldOrdinal", 
+	        "missing time stamp field ordinal")
+	        val timeStampInMili = getBooleanParamOrElse(appConfig, "time.inMili", true)
+	        
+	        val analyzers = seasonalCycleTypes.map(sType => {
+	    	val seasonalAnalyzer = createSeasonalAnalyzer(this, appConfig, sType, timeZoneShiftHours, timeStampInMili)
+	        seasonalAnalyzer
+	    })
+	    Some((analyzers, timeStampFieldOrdinal))
+	   } else {
+		   None
+	   }
 	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath).cache
@@ -74,7 +95,11 @@ object MultiVariateDistribution extends JobConfiguration {
 	           for (kf <- ordinals) {
 	               key.addString(items(kf))
 	           }
-
+	    	   if (seasonalAnalysis) {
+	    	     val i = ordinals.length
+	    	     key.addString(items(i))
+	    	     key.addString(items(i + 1))
+	    	   }
 	           (key.toString, line)
 	       }).countByKey()
 	       count
@@ -98,6 +123,9 @@ object MultiVariateDistribution extends JobConfiguration {
 	         	case None => 0
 	         }
 	     )
+	     if (seasonalAnalysis) {
+	       len += 2
+	     }
 	     
 	     val bucket = Record(len)
 	     keyFieldOrdinals match {
@@ -107,6 +135,11 @@ object MultiVariateDistribution extends JobConfiguration {
 	               bucket.addString(items(kf))
 	           }
 	        })
+	    	if (seasonalAnalysis) {
+	    	     val i = ordinals.length
+	    	     bucket.addString(items(i))
+	    	     bucket.addString(items(i + 1))
+	    	 }
 	      }
 	      case None => 
 	    }
@@ -148,7 +181,8 @@ object MultiVariateDistribution extends JobConfiguration {
 	     } else {
 	       val partId = keyFieldOrdinals match {
 	       		case Some(ordinals : Array[Integer]) => {
-	       		  kv._1.toString(0, ordinals.length)
+	       		  var len = getKeyLen(ordinals, seasonalAnalysis)
+	       		  kv._1.toString(0, len)
 	       		}
 	       		case None => {	    
 	       			"all" 
@@ -164,8 +198,9 @@ object MultiVariateDistribution extends JobConfiguration {
 	     }	     
 	     val bucket = keyFieldOrdinals match {
        		case Some(ordinals : Array[Integer]) => {
-       		  val key = kv._1.toString(0, ordinals.length)
-       		  val bucket = kv._1.toString(ordinals.length, kv._1.size, ":")
+       		  var len = getKeyLen(ordinals, seasonalAnalysis)
+       		  val key = kv._1.toString(0, len)
+       		  val bucket = kv._1.toString(len, kv._1.size, ":")
        		  key + fieldDelimOut + bucket
        		}
        		case None => {	    
@@ -185,5 +220,18 @@ object MultiVariateDistribution extends JobConfiguration {
 	     formAggrData.saveAsTextFile(outputPath) 
 	   }
 	   
+   }
+   
+   /**
+   * @param ordinals
+   * @param seasonalAnalysis
+   * @return
+   */
+   def getKeyLen(ordinals: Array[Integer], seasonalAnalysis:Boolean) : Int = {
+	  var len = ordinals.length
+   	  if (seasonalAnalysis) {
+   		    len += 2
+   	  }
+      len
    }
 }

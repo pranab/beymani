@@ -53,6 +53,7 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected RichAttributeSchema schema;
 	protected StringBuilder stBld = new StringBuilder();
 	protected String subFieldDelim = ";";
+	protected boolean seasonal;
 
 	/**
 	 * Storm usage
@@ -151,8 +152,9 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	 * @param distrFilePath
 	 * @throws IOException
 	 */
-	public DistributionBasedPredictor(Map<String, Object> config, String idOrdinalsParam, String distrFilePathParam, String hdfsFileParam, 
-			String schemaFilePathParam, String scoreThresholdParam) throws IOException {
+	public DistributionBasedPredictor(Map<String, Object> config, String idOrdinalsParam, String distrFilePathParam, 
+			String hdfsFileParam, String schemaFilePathParam, String seasonalParam, String fieldDelimParam, 
+			String scoreThresholdParam) throws IOException {
 		super();
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
@@ -163,7 +165,9 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 		} else {
 			fs = BasicUtils.getFileStream(filePath);
 		}
-
+		seasonal = ConfigUtility.getBoolean(config, seasonalParam);
+		String delim = ConfigUtility.getString(config, fieldDelimParam, ",");
+		
     	BufferedReader reader = new BufferedReader(new InputStreamReader(fs));
     	String line = null; 
     	String[] items = null;
@@ -176,6 +180,11 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
     			compKey = BasicUtils.join(items, 0, idOrdinals.length);
     			i += idOrdinals.length;
     		}
+    		if (seasonal) {
+    			compKey = compKey + delim + items[i] + delim + items[i+1];
+    			i += 2;
+    		}
+
     		String bucket = items[i++];
   		  	int count = Integer.parseInt(items[i++]);
   		  	
@@ -213,21 +222,15 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	 * @return
 	 */
 	protected String getBucketKey(String[] items) {
-		stBld.delete(0, stBld.length());
-		String bucketElement = null;
-		for (RichAttribute field : schema.getFields()) {
-			String	item = items[field.getOrdinal()];
-			if (field.isCategorical()){
-				bucketElement = item;
-			} else if (field.isInteger()) {
-				bucketElement = "" + Integer.parseInt(item) / field.getBucketWidth();
-			} else if (field.isDouble()) {
-				bucketElement = "" + ((int)Double.parseDouble(item)) / field.getBucketWidth();
-			}			
-			stBld.append(bucketElement).append(subFieldDelim);
+		int i = 0;
+		if (null != idOrdinals) {
+			i += idOrdinals.length;
 		}
-		stBld.delete(stBld.length()-1, stBld.length());
-		return stBld.toString();
+		if (seasonal) {
+			i += 2;
+		}
+		String bucket = items[i];
+		return bucket;
 	}
 	
 }
