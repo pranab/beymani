@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.Scanner;
 
 import org.apache.hadoop.conf.Configuration;
+import org.chombo.stats.HistogramStat;
+import org.chombo.stats.HistogramUtility;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
 import org.chombo.util.BasicUtils;
@@ -47,6 +49,7 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected Cache cache;
 	protected Map<String, Integer> distrModel = new HashMap<String, Integer>();
 	protected Map<String, Map<String, Integer>> keyedDistrModel = new HashMap<String, Map<String, Integer>>();
+	protected Map<String, HistogramStat> keyedHist = new HashMap<String, HistogramStat>();
 	protected int totalCount;
 	protected Map<String, Integer> totalCounts = new HashMap<String, Integer>();
 	protected RichAttributeSchema schema;
@@ -118,9 +121,50 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
     	scoreThreshold =  Double.parseDouble(config.get("dbp.score.threshold"));
 	}
 	
-	public DistributionBasedPredictor(Map<String, Object> config, String distrFilePathParam, String hdfsFileParam,
-			String schemaFilePathParam, String scoreThresholdParam) throws IOException {
+	/**
+	 * @param config
+	 * @param idOrdinalsParam
+	 * @param distrFilePathParam
+	 * @param hdfsFileParam
+	 * @param schemaFilePathParam
+	 * @param seasonalParam
+	 * @param fieldDelimParam
+	 * @param scoreThresholdParam
+	 * @param pseudoMultiVariate
+	 * @throws IOException
+	 */
+	/*
+	public DistributionBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
+			String distrFilePathParam, String hdfsFileParam,
+			String schemaFilePathParam, String seasonalParam, String fieldDelimParam, 
+			String scoreThresholdParam, boolean pseudoMultiVariate) throws IOException {
 		super();
+		if (pseudoMultiVariate) {
+			initializePseudoMultiVariate(config, idOrdinalsParam, distrFilePathParam, hdfsFileParam,
+					schemaFilePathParam, seasonalParam, fieldDelimParam, scoreThresholdParam);
+		} else {
+			initializeMultiVariate(config, idOrdinalsParam, distrFilePathParam, hdfsFileParam,
+					schemaFilePathParam, seasonalParam, fieldDelimParam, scoreThresholdParam);
+		}
+		
+	}
+	 */
+	
+	/**
+	 * @param config
+	 * @param idOrdinalsParam
+	 * @param distrFilePathParam
+	 * @param hdfsFileParam
+	 * @param schemaFilePathParam
+	 * @param seasonalParam
+	 * @param fieldDelimParam
+	 * @param scoreThresholdParam
+	 * @throws IOException
+	 */
+	public DistributionBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
+			String attrListParam, String distrFilePathParam, String hdfsFileParam,
+			String schemaFilePathParam, String seasonalParam, String fieldDelimParam, 
+			String scoreThresholdParam) throws IOException {
 		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
 		String filePath = ConfigUtility.getString(config, distrFilePathParam);
 		InputStream fs = null;
@@ -129,24 +173,27 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 		} else {
 			fs = BasicUtils.getFileStream(filePath);
 		}
+		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
+		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
+		seasonal = ConfigUtility.getBoolean(config, seasonalParam);
+		int keyLen = idOrdinals.length;
+		keyLen += (seasonal ? 2 : 0);
+		++keyLen;
+		String delim = ConfigUtility.getString(config, fieldDelimParam, ",");
 
-		BufferedReader reader = new BufferedReader(new InputStreamReader(fs));
-    	String line = null; 
-    	String[] items = null;
+		Map<String[], HistogramStat> keyedHist = HistogramUtility.createHiostograms(fs,  keyLen, false);
+		for (String[] key : keyedHist.keySet()) {
+			String compKey = BasicUtils.join(key, delim);
+			this.keyedHist.put(compKey, keyedHist.get(key));
+		}
 		
-    	while((line = reader.readLine()) != null) {
-    		items = line.split(",");
-  		  	int count = Integer.parseInt(items[1]);
-  		  	totalCount += count;
-  		  	distrModel.put(items[0], count);
-    	} 	
- 
        	String schemFilePath = ConfigUtility.getString(config, schemaFilePathParam);
     	schema = BasicUtils.getRichAttributeSchema(schemFilePath);
     	scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 	}
 
 	/**
+	 * for multi variate distribution
 	 * @param config
 	 * @param distrFilePath
 	 * @throws IOException
@@ -154,7 +201,6 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	public DistributionBasedPredictor(Map<String, Object> config, String idOrdinalsParam, String distrFilePathParam, 
 			String hdfsFileParam, String schemaFilePathParam, String seasonalParam, String fieldDelimParam, 
 			String scoreThresholdParam) throws IOException {
-		super();
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
 		String filePath = ConfigUtility.getString(config, distrFilePathParam);

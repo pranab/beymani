@@ -46,9 +46,11 @@ public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredict
 	 * @param scoreThresholdParam
 	 * @throws IOException
 	 */
-	public EstimatedProbabilityBasedPredictor(Map<String, Object> config, String idOrdinalsParam, String distrFilePathParam, String hdfsFileParam, 
-			String schemaFilePathParam, String seasonalParam, String fieldDelimParam, String scoreThresholdParam) throws IOException {
-		super(config, idOrdinalsParam, distrFilePathParam, hdfsFileParam, schemaFilePathParam, seasonalParam,  fieldDelimParam, scoreThresholdParam);
+	public EstimatedProbabilityBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
+			String distrFilePathParam, String hdfsFileParam, String schemaFilePathParam, 
+			String seasonalParam, String fieldDelimParam, String scoreThresholdParam) throws IOException {
+		super(config, idOrdinalsParam, distrFilePathParam, hdfsFileParam, schemaFilePathParam, 
+				seasonalParam,  fieldDelimParam, scoreThresholdParam);
 	}
 
 	/**

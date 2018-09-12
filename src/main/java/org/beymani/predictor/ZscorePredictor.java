@@ -33,10 +33,8 @@ import org.chombo.util.Utility;
  *
  */
 public class ZscorePredictor  extends ModelBasedPredictor{
-	private int[] attrOrdinals;
 	private NumericalAttrStatsManager statsManager;
 	private String fieldDelim;
-	private double[] attrWeights;
 	private boolean seasonal;
 	protected MessageQueue outQueue;
 	protected Cache cache;

@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.chombo.stats.HistogramStat;
+import org.chombo.util.BasicUtils;
 import org.chombo.util.ConfigUtility;
 import org.chombo.util.RichAttribute;
 import org.chombo.util.Utility;
@@ -35,7 +37,6 @@ import org.chombo.util.Utility;
 public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBasedPredictor {
 	private Map<Integer, Map<String, Integer>> attrDistr = new HashMap<Integer, Map<String, Integer>>();
 	private Map<Integer, Integer> attrDistrCounts = new HashMap<Integer, Integer>();
-	private double[] attrWeights;
 	private boolean requireMissingAttrValue;
 	private String fieldDelim;
 	
@@ -62,21 +63,22 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	
 	/**
 	 * @param config
+	 * @param idOrdinalsParam
 	 * @param distrFilePathParam
 	 * @param hdfsFileParam
 	 * @param schemaFilePathParam
 	 * @param attrWeightParam
 	 * @param scoreThresholdParam
+	 * @param seasonalParam
 	 * @param fieldDelimParam
 	 * @throws IOException
 	 */
-	public EsimatedAttrtibuteProbabilityBasedPredictor(Map<String, Object> config, String distrFilePathParam, 
-			String hdfsFileParam, String schemaFilePathParam,String attrWeightParam, String scoreThresholdParam, 
-			String fieldDelimParam) throws IOException {
-		super(config,  distrFilePathParam,  hdfsFileParam,schemaFilePathParam, scoreThresholdParam);
+	public EsimatedAttrtibuteProbabilityBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
+			String attrListParam, String distrFilePathParam, String hdfsFileParam, String schemaFilePathParam,String attrWeightParam, 
+			 String seasonalParam, String fieldDelimParam, String scoreThresholdParam) throws IOException {
+		super(config, idOrdinalsParam,  attrListParam, distrFilePathParam, hdfsFileParam, schemaFilePathParam,  seasonalParam,  
+				fieldDelimParam, scoreThresholdParam);
 			
-		buildAttributeWiseDistr();
-
 		//attribute weights
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam);
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
@@ -167,9 +169,21 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 
 	@Override
 	public double execute(String[] items, String compKey) {
-		//TODO
 		double score = 0;
+		int i = 0;
+		double totalWt = 0;
+		//System.out.println("execute compKey " + compKey);
+		for (int ord  :  attrOrdinals) {
+			double val = Double.parseDouble(items[ord]);
+			HistogramStat hist = keyedHist.get(compKey);
+			double distr = hist.findDistr(val);
+			score += (1.0 - distr) * attrWeights[i];
+			totalWt += attrWeights[i];
+			++i;
+		}
+		score /=  totalWt ;
 		
+		scoreAboveThreshold = score > scoreThreshold;
 		return score;
 	}
 	
