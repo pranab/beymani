@@ -25,6 +25,7 @@ import org.chombo.util.BaseAttribute
 import com.typesafe.config.Config
 import java.lang.Boolean
 import org.beymani.predictor.ZscorePredictor
+import org.beymani.predictor.ExtremeValuePredictor
 import org.beymani.predictor.RobustZscorePredictor
 import org.chombo.util.SeasonalAnalyzer
 import org.chombo.spark.common.SeasonalUtility
@@ -36,6 +37,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    private val predStrategyRobustZscore = "robustZscore";
    private val predStrategyEstProb = "estimatedProbablity";
    private val predStrategyEstAttrProb = "estimatedAttributeProbablity";
+   private val predStrategyExtremeValueProb = "extremeValueProbablity";
    
    /**
    * @param args
@@ -93,19 +95,23 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val saveOutput = appConfig.getBoolean("save.output")
 
 	   val predictor = predictorStrategy match {
-       	case `predStrategyZscore` => new ZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
+       	  case `predStrategyZscore` => new ZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold",
-       	    "exp.const");
+       	    "exp.const")
          
-       	case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
+       	  case `predStrategyExtremeValueProb` => new ExtremeValuePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
+       	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold",
+       	    "exp.const")
+
+       	  case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	     "stats.medFilePath", "stats.madFilePath", "field.delim.in", "attr.weights","seasonal.analysis",
        	     "hdfs.file", "exp.const","score.threshold");
      
-       	case `predStrategyEstProb` => new EstimatedProbabilityBasedPredictor(algoConfig, "id.fieldOrdinals", 
+       	  case `predStrategyEstProb` => new EstimatedProbabilityBasedPredictor(algoConfig, "id.fieldOrdinals", 
        	     "distr.file.path", "hdfs.file", "schema.file.path", "seasonal.analysis", "field.delim.in", 
        	      "score.threshold")
        	
-       	case `predStrategyEstAttrProb` => new EsimatedAttrtibuteProbabilityBasedPredictor(algoConfig, 
+       	  case `predStrategyEstAttrProb` => new EsimatedAttrtibuteProbabilityBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.file.path", "hdfs.file", "schema.file.path", 
        	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold")
 	   }
@@ -226,7 +232,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       val isHdfsFile = getBooleanParamOrElse(appAlgoConfig, "hdfs.file", false)
 	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
 	     }
-	     case `predStrategyRobustZscore` => {
+	     case `predStrategyExtremeValueProb` => {
 	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
 	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
 	       configParams.put("attr.weights", attrWeights)
