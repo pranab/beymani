@@ -11,6 +11,14 @@ Build
 =====
 Follow instructions in spark_dependency.txt
 
+Python dependency
+=================
+The shell script commands for data generation run python scripts for data generation. Before you run 
+the data generation commands do the following
+1. checkout project avenir
+2. copy the avenir/python/lib directory to ../lib with respect to your location of cpu_usage.py file
+
+
 Create base normal data
 =======================
 ./and_spark.sh crInput <num_of_days> <reading_intervaL> <num_servers> <output_file>
