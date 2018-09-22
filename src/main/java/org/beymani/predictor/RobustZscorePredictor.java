@@ -101,8 +101,7 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 		expConst = ConfigUtility.getDouble(config, expConstParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 	}
-		
-	
+
 	/**
 	 * Hadoop MR usage for robust zscore
 	 * @param config
