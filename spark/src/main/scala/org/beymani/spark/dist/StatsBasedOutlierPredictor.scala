@@ -90,7 +90,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 		   None
 	   }
 	   
-	   
+	   val thresholdNorm = this.getOptionalDoubleParam(appConfig, "score.thresholdNorm")
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 
@@ -171,6 +171,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 		   marker.equals("O")
 	   })
 	   if (remOutliers) {
+	     //additional output for input with outliers subtracted
 	     taggedData = taggedData.map(line => {
 		   val items = line.split(fieldDelimIn, -1)
 	       val ar = items.slice(0, items.length - 2)
@@ -181,7 +182,19 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     val cleanData =  data.subtract(taggedData)
 	     cleanData.saveAsTextFile(cleanDataDirPath) 
 	   }
-	 } 
+	 } else {
+	   //all or only records above a threshold
+	   taggedData =  thresholdNorm match {
+	     case Some(threshold:Double) => {
+	       taggedData.filter(line => {
+	         val items = line.split(fieldDelimIn, -1)
+	         val score = items(items.length - 2).toDouble
+	         score > threshold
+	       })
+	     }
+	     case None => taggedData
+	   }
+	 }
 	  
 	 if (debugOn) {
          val records = taggedData.collect
@@ -222,6 +235,9 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val expConst :java.lang.Double = getDoubleParamOrElse(appConfig, "exp.const", 1.0)
 	   configParams.put("exp.const", expConst);
 	   
+	   val isHdfsFile = getBooleanParamOrElse(appConfig, "hdfs.file", false)
+	   configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
+	   
 	   predictorStrategy match {
 	     case `predStrategyZscore` => {
 	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
@@ -229,8 +245,6 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       configParams.put("attr.weights", attrWeights)
 	       val statsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.file.path", "missing stat file path")
 	       configParams.put("stats.filePath", statsFilePath)
-	       val isHdfsFile = getBooleanParamOrElse(appAlgoConfig, "hdfs.file", false)
-	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
 	     }
 	     case `predStrategyExtremeValueProb` => {
 	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
@@ -240,25 +254,18 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       configParams.put("stats.medFilePath", medStatsFilePath)
 	       val madStatsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.madFilePath", "missing mad stat file path")
 	       configParams.put("stats.madFilePath", madStatsFilePath)
-	       val isHdfsFile = getBooleanParamOrElse(appAlgoConfig, "hdfs.file", false)
-	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
 	     }
 	     case `predStrategyEstProb` => {
 	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
 	       configParams.put("distr.filePath", distrFilePath)
-	       val isHdfsFile = getBooleanParamOrElse(appAlgoConfig, "hdfs.file", false)
-	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
 	       val schemaFilePath = getMandatoryStringParam(appAlgoConfig, "schema.file.path", "missing schema file path")
 	       configParams.put("schema.filePath", schemaFilePath)
 	     }
 	     case `predStrategyEstAttrProb` => {
 	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
 	       configParams.put("distr.filePath", distrFilePath)
-	       val isHdfsFile = getBooleanParamOrElse(appAlgoConfig, "hdfs.file", false)
-	       configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
 	       val schemaFilePath = getMandatoryStringParam(appAlgoConfig, "schema.file.path", "missing schema file path")
 	       configParams.put("schema.filePath", schemaFilePath)
-	       
 	     }
 	   }
 	   
