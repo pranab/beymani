@@ -20,3 +20,10 @@ Build uber jar
 ant -f beymani_spark.xml
 
 uber jar file name is uber-beymani-spark-1.0.jar
+
+If you are using Spark 2.0+, please add the following line to beymani_spark.xml, because 
+type safe jar is not included in newer versions of Spark
+
+<zipgroupfileset dir="/Users/pranab/.ivy2/cache/com.typesafe/config/jars" includes="config-1.2.1.jar" />
+
+Please change the directory path, as per your environment
