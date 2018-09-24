@@ -16,6 +16,7 @@ The following blogs of mine are good source of details of beymani
 * http://pkghosh.wordpress.com/2012/06/18/its-a-lonely-life-for-outliers/
 * http://pkghosh.wordpress.com/2012/10/18/relative-density-and-outliers/
 * http://pkghosh.wordpress.com/2013/10/21/real-time-fraud-detection-with-sequence-mining/
+* pkghosh.wordpress.com/2018/09/18/contextual-outlier-detection-with-statistical-modeling-on-spark/
 
 ## Algorithms
 * Multi variate instance distribution model
