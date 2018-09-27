@@ -68,13 +68,14 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val remOutliers = getBooleanParamOrElse(appConfig, "rem.outliers", false)
 	   val cleanDataDirPath = getConditionalMandatoryStringParam(remOutliers, appConfig, "clean.dataDirPath", 
 	       "missing clean data file output directory")
-	   
+	   val seasonalTypeFldOrd = getOptionalIntParam(appConfig, "seasonal.typeFldOrd")
 	   
 	   //seasonal data
 	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
 	   val partBySeasonCycle = getBooleanParamOrElse(appConfig, "part.bySeasonCycle", true)
+	   val analyzerMap = scala.collection.mutable.Map[String, (SeasonalAnalyzer, Int)]()
 	   val seasonalAnalyzers = if (seasonalAnalysis) {
-		   val seasonalCycleTypes = getMandatoryStringListParam(appConfig, "seasonal.cycleType", 
+		   	val seasonalCycleTypes = getMandatoryStringListParam(appConfig, "seasonal.cycleType", 
 	        "missing seasonal cycle type").asScala.toArray
 	        val timeZoneShiftHours = getIntParamOrElse(appConfig, "time.zoneShiftHours", 0)
 	        val timeStampFieldOrdinal = getMandatoryIntParam(appConfig, "time.fieldOrdinal", 
@@ -82,12 +83,13 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	        val timeStampInMili = getBooleanParamOrElse(appConfig, "time.inMili", true)
 	        
 	        val analyzers = seasonalCycleTypes.map(sType => {
-	    	val seasonalAnalyzer = createSeasonalAnalyzer(this, appConfig, sType, timeZoneShiftHours, timeStampInMili)
-	        seasonalAnalyzer
-	    })
-	    Some((analyzers, timeStampFieldOrdinal))
+	        	val seasonalAnalyzer = createSeasonalAnalyzer(this, appConfig, sType, timeZoneShiftHours, timeStampInMili)
+	        	analyzerMap += (sType -> (seasonalAnalyzer, timeStampFieldOrdinal))
+	        	seasonalAnalyzer
+	        })
+	        Some((analyzers, timeStampFieldOrdinal))
 	   } else {
-		   None
+		   	None
 	   }
 	   
 	   val thresholdNorm = this.getOptionalDoubleParam(appConfig, "score.thresholdNorm")
@@ -146,22 +148,55 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	           }
 	           case None =>
 	       }
-		     
-		   //seasonality cycle
-		   seasonalAnalyzers match {
-		     case Some(seAnalyzers : (Array[SeasonalAnalyzer], Int)) => {
-		         val timeStamp = items(seAnalyzers._2).toLong
-		         val cIndex = SeasonalAnalyzer.getCycleIndex(seAnalyzers._1, timeStamp)
-		         key.addString(cIndex.getLeft())
-		         if (partBySeasonCycle) key.addInt(cIndex.getRight())
+		   
+		   seasonalTypeFldOrd match {
+		     //seasonal type field in data
+		     case Some(seasonalOrd:Int) => {
+		       val seasonalType = items(seasonalOrd)
+		       val analyzer = analyzerMap.get(seasonalType)
+		       analyzer match {
+		         case Some(an:(SeasonalAnalyzer, Int)) => {
+		            val analyzer = an._1
+		        	val tsFldOrd = an._2
+		            val timeStamp = items(tsFldOrd).toLong
+		            val cIndex = SeasonalAnalyzer.getCycleIndex(analyzer, timeStamp)
+		            key.addString(cIndex.getLeft())
+		            key.addInt(cIndex.getRight())
+		         }
+		         //not seasonal
+		         case None => 
 		       }
-		     case None => 
-		   }	  
-		   val keyStr = key.toString
-		   val predictor = brPredictor.value
-		   val score:java.lang.Double = predictor.execute(items, keyStr)
-		   val marker = if (score > scoreThreshold) "O"  else "N"
-		   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
+		     }
+		     
+		     //seasonal type in configuration
+		     case None => {
+			   seasonalAnalyzers match {
+			     case Some(seAnalyzers : (Array[SeasonalAnalyzer], Int)) => {
+			    	 val tsFldOrd = seAnalyzers._2
+			         val timeStamp = items(tsFldOrd).toLong
+			         val analyzers = seAnalyzers._1
+			         val cIndex = SeasonalAnalyzer.getCycleIndex(analyzers, timeStamp)
+			         key.addString(cIndex.getLeft())
+			         key.addInt(cIndex.getRight())
+			       }
+			     case None => 
+			   }	
+		       
+		       
+		     }
+		   }
+		     
+		   if (seasonalAnalysis &&  key.getInt(key.size - 1) == -1) {
+		       //seasonal but invalid cycle index
+			   line + fieldDelimOut + BasicUtils.formatDouble(0.0, precision) + fieldDelimOut + "A"
+		   } else {
+			   //other cases
+			   val keyStr = key.toString
+			   val predictor = brPredictor.value
+			   val score:java.lang.Double = predictor.execute(items, keyStr)
+			   val marker = if (score > scoreThreshold) "O"  else "N"
+			   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
+		   }
 	 })
 	 
 	 if (outputOutliers || remOutliers) {
