@@ -5,6 +5,7 @@
 		<zipgroupfileset dir="/Users/pranab/Projects/beymani/spark/target/scala-2.10" includes="beymani-spark_2.10-1.0.jar" /> 
 		<zipgroupfileset dir="/Users/pranab/Projects/chombo/spark/target/scala-2.10" includes="chombo-spark_2.10-1.0.jar" /> 
 		<zipgroupfileset dir="/Users/pranab/Projects/chombo/target" includes="chombo-1.0.jar" /> 
+		<zipgroupfileset dir="/Users/pranab/Projects/hoidla/target" includes="hoidla-1.0.jar" /> 
 		<zipgroupfileset dir="/Users/pranab/Projects/beymani/target" includes="beymani-1.0.jar" /> 
 	</jar>
 </target>

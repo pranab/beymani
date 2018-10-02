@@ -163,8 +163,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 		            key.addString(cIndex.getLeft())
 		            key.addInt(cIndex.getRight())
 		         }
-		         //not seasonal
-		         case None => 
+		         //unexpected
+		         case None => throw new IllegalStateException("missing seasonal analyzer")
 		       }
 		     }
 		     
@@ -179,10 +179,9 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			         key.addString(cIndex.getLeft())
 			         key.addInt(cIndex.getRight())
 			       }
+			     //not seasonal
 			     case None => 
 			   }	
-		       
-		       
 		     }
 		   }
 		     
