@@ -25,14 +25,16 @@ import org.chombo.spark.common.Record
 import org.chombo.util.BaseAttribute
 import com.typesafe.config.Config
 import org.hoidla.window.SizeBoundPredictorWindow
+import org.chombo.stats.SimpleStat
+import org.chombo.util.MathUtils
+import org.beymani.spark.common.OutlierUtility
 
-object OneStepAheadPredictor extends JobConfiguration {
-   private val predStrategyAverage = "average";
-   private val predStrategyWeightedAverage = "weightedAverage";
-   private val predStrategyMedian = "median";
-   private val predStrategyRegression = "regression";
-   private val predStrategyExponential = "exponential";
-   private val predStrategyHoltLinear = "holtLinear";
+/**
+ * Anomaly detection in sequence data based on one step ahead prediction
+ * @author pranab
+ *
+ */
+object OneStepAheadPredictor extends JobConfiguration with OutlierUtility {
   
    /**
    * @param args
@@ -49,37 +51,54 @@ object OneStepAheadPredictor extends JobConfiguration {
 	   //configuration params
 	   val fieldDelimIn = appConfig.getString("field.delim.in")
 	   val fieldDelimOut = appConfig.getString("field.delim.out")
-	   val predictorStrategy = getStringParamOrElse(appConfig, "predictor.strategy", predStrategyAverage)
+	   val predictorStrategy = getStringParamOrElse(appConfig, "predictor.strategy", 
+	       SizeBoundPredictorWindow.PRED_AVERAGE)
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
 	   val keyFieldOrdinals = keyFields match {
 	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
 	     case None => None  
 	   }
-	   val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
-	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
-	   val outputOutliers = getBooleanParamOrElse(appConfig, "output.outliers", false)
-	   val remOutliers = getBooleanParamOrElse(appConfig, "rem.outliers", false)
-	   val cleanDataDirPath = getConditionalMandatoryStringParam(remOutliers, appConfig, "clean.dataDirPath", 
-	       "missing clean data file output directory")
-	   val threshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	   
-	   val expConst :java.lang.Double = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
-	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
-	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
-	   val windowSize = getIntParamOrElse(appConfig, "window.size", 3)
 	   
-	   val averagingWeights = if (predictorStrategy.equals(SizeBoundPredictorWindow.PRED_WEIGHTED_AVERAGE)) {
+	  val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
+	  val attrOrdsList = attrOrds.toList
+	  val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
+	  val outputOutliers = getBooleanParamOrElse(appConfig, "output.outliers", false)
+	  val remOutliers = getBooleanParamOrElse(appConfig, "rem.outliers", false)
+	  val cleanDataDirPath = getConditionalMandatoryStringParam(remOutliers, appConfig, "clean.dataDirPath", 
+	       "missing clean data file output directory")
+	  val statDataDirPath = getMandatoryStringParam(appConfig, "stat.dataDirPath", 
+	       "missing stat file output directory path")
+	  val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	   
+	  val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
+	  val expConst = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
+	  val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
+	  val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
+	  val windowSize = getIntParamOrElse(appConfig, "window.size", 3)
+	  val minStatCount = getIntParamOrElse(appConfig, "min.statCount", 5)
+	  val rangeConfLevel = getDoubleParamOrElse(appConfig, "range.confLevel", 0.95)
+	  val tDistVal = MathUtils.linearInterpolate(MathUtils.tDistr, rangeConfLevel)
+	  val statTag = "$STAT$"
+	  val averagingWeights = if (predictorStrategy.equals(SizeBoundPredictorWindow.PRED_WEIGHTED_AVERAGE)) {
 	     val wtList = getMandatoryDoubleListParam(appConfig, "averaging.weights", "missing averaging weights")
 	     BasicUtils.fromListToDoubleArray(wtList)
-	   } else {
+	  } else {
 	     null
-	   }
+	  }
 	   
-	   val expSmoothFactor = if (predictorStrategy.equals(SizeBoundPredictorWindow.PRED_EXP_SMOOTHING)) {
+	  val expSmoothFactor = if (predictorStrategy.equals(SizeBoundPredictorWindow.PRED_EXP_SMOOTHING)) {
 	     getMandatoryDoubleParam(appConfig, "exp.smoothFactor", "missing exponential smoothing factor")
 	   } else {
 	     0
-	 }
+	  }
+	  
+	  //residue stats
+	  val resStatFilePath = getMandatoryStringParam(appConfig, "res.statFilePath", "missing residute stats file")
+	  val resStats = getResidueStats(resStatFilePath, fieldDelimIn)
+	  val brResStats = sparkCntxt.broadcast(resStats)
+	  
+	  val debugOn = appConfig.getBoolean("debug.on")
+	  val saveOutput = appConfig.getBoolean("save.output")
 	  
 	  //for sorting by sequence
 	  val sortFields = Array[Int](1)
@@ -90,7 +109,6 @@ object OneStepAheadPredictor extends JobConfiguration {
 	    case Some(fields : Array[Integer]) => keyLen +=  fields.length
 	    case None =>
 	  }
-
 	   
 	 //input
 	 val data = sparkCntxt.textFile(inputPath)
@@ -118,34 +136,114 @@ object OneStepAheadPredictor extends JobConfiguration {
 	   (key, value)
 	 })	   
 	   
-	 val taggedData = keyedData.groupByKey.flatMap(v => {
+	 val allTaggedData = keyedData.groupByKey.flatMap(v => {
+	   val key = v._1
+	   val keyStr = key.toString
+	   val values = v._2.toList.sortBy(v => v.getLong(0))
+	   
+	   //window
 	   var windows = Map[Int, SizeBoundPredictorWindow]()
-	   attrOrds.toList.foreach(i => {
+	   attrOrdsList.foreach(i => {
 	     windows += (i -> new SizeBoundPredictorWindow(windowSize, predictorStrategy))
 	   })
-	   val key = v._1
-	   var values = v._2.toList
-	   values = values.sortBy(v => v.getLong(0))
-	   values.map(v => {
+	   
+	   //residue stats
+	   val allResStats = brResStats.value
+	   var resStats = Map[Int,SimpleStat]()
+	   attrOrdsList.foreach(i => {
+	     val statsKey = key.toString + fieldDelimIn + i
+	     val stat = allResStats.getOrElse(statsKey, null)
+	     val clonedStat = new SimpleStat(stat.getCount(), stat.getSum(), stat.getSumSq(),
+	         stat.getMean(), stat.getStdDev());
+	     resStats += (i -> clonedStat)
+	   })
+	   
+	   //tagged records
+	   val recs = values.map(v => {
 	     val line = v.getString(1)
 	     val items = line.split(fieldDelimIn, -1)
 	     
-	     attrOrds.toList.foreach(i => {
-	       val windowOpt = windows.get(i)
+	     val scores = attrOrdsList.map(i => {
+	       val window = windows.getOrElse(i, null)
+	       val stat = resStats.getOrElse(i, null)
 	       val quant = items(i).toDouble
-	       windowOpt match {
-	         case Some(window:SizeBoundPredictorWindow) => {
-	           window.add(quant)
-	           
-	         }
-	         case None => throw new IllegalStateException("")
+	       window.add(quant)
+	       val quantPrediction = window.getPrediction()
+	       val score = if (stat.getCount() > minStatCount) {
+	         val count = stat.getCount()
+	         val stdDev = stat.getStdDev()
+	         val range = tDistVal * stdDev * Math.sqrt(1.0 + 1.0 / count)
+	         var score = Math.abs(quantPrediction - quant) / range
+	         score = BasicUtils.expScale(expConst, score);
+	         score
+	       } else {
+	         0.0
 	       }
-	     })
+	       stat.add(quant - quantPrediction)
+	       score
+	     }).toArray
+	     
+	     val score = MathUtils.weightedAverage(scores, attrWeights)
+	     val marker = if (score > scoreThreshold) "O"  else "N"
+	     line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker  
 	   })
 	   
-	   List[Record]()
+	   //records for stat
+	   val statRecs = resStats.map(v => {
+	     statTag + keyStr + fieldDelimOut + v._1.toString + fieldDelimOut + v._2.toString
+	   }).toList
+	   
+	   recs ++ statRecs
+	 }).cache
+	 
+	 //normal records
+	 var taggedData = allTaggedData.filter(line => {
+	   !line.startsWith(statTag)
 	 })
 	   
+	 //stat records
+	 val statData = allTaggedData.
+	 	filter(line => line.startsWith(statTag)).
+	 	map(line => line.substring(statTag.length()))
+	 statData.saveAsTextFile(statDataDirPath) 
+	 
+	 //process tagged records
+	 taggedData = processTaggedData(outputOutliers, remOutliers, cleanDataDirPath,fieldDelimIn, fieldDelimOut, 
+	     thresholdNorm, taggedData, data)	 	
+
+	 if (debugOn) {
+         val records = taggedData.collect
+         records.slice(0, 100).foreach(r => println(r))
+     }
 	   
+	 if(saveOutput) {	   
+	     taggedData.saveAsTextFile(outputPath) 
+	 }	 
+	     
    }
+   
+   /**
+   * @param filePath
+   * @param fieldDelimIn
+   * @return
+   */
+   def getResidueStats(filePath:String, fieldDelimIn:String) : Map[String, SimpleStat]= {
+     var stats = Map[String, SimpleStat]()
+     val lines = BasicUtils.getFileLines(filePath).asScala.toList
+     var pos = -1
+     lines.foreach(line => {
+       if (pos < 0){
+    	   val items = line.split(fieldDelimIn, -1)
+    	   pos = BasicUtils.findOccurencePosition(line, fieldDelimIn, items.length - 5, true)
+       }
+       val parts = BasicUtils.splitOnPosition(line, pos, 1,  true)
+       val key = parts(0)
+       val stat = new SimpleStat()
+       stat.fromString(parts(1))
+       stats += (key -> stat)
+     })
+     stats
+   }
+   
+   
 }
