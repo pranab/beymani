@@ -16,6 +16,7 @@
  */
 
 package org.beymani.spark.common
+
 import org.chombo.spark.common.JobConfiguration
 import org.apache.spark.SparkContext
 import scala.collection.JavaConverters._
@@ -60,15 +61,14 @@ object ThresholdLearner extends JobConfiguration {
 	   //key by split
 	   var splitRecs = data.flatMap(line => {
 	     val items = line.split(fieldDelimIn, -1)
-	     val key = Record(2)
+	     val score = items(scoreFldOrd).toDouble
+	     val clLabel = items(clsFldOrd)
 	     val recs = splitPoints.map(sp => {
-	       val score = line(scoreFldOrd).toDouble
-	       val clLabel = line(clsFldOrd)
 	       val part = if (score < sp) 0 else 1
 	       val key = Record(2)
-	       key.add(sp)
-	       key.add(part)
-	       
+	       key.addDouble(sp)
+	       key.addInt(part)
+	    	   
 	       val value = Record(2)
 	       if (clLabel.equals(posClsLabel)) {
 	         value.addInt(1)
@@ -85,21 +85,28 @@ object ThresholdLearner extends JobConfiguration {
 	   //aggregate counts
 	   splitRecs = splitRecs.reduceByKey((v1, v2) => {
 	     val value = Record(2)
-	     value.add(v1.getInt(0) + v2.getInt(0))
-	     value.add(v1.getInt(1) + v2.getInt(1))
+	     value.addInt(v1.getInt(0) + v2.getInt(0))
+	     value.addInt(v1.getInt(1) + v2.getInt(1))
 	     value
 	   })
 	   
 	   //calculate info content
 	   splitRecs = splitRecs.mapValues(v => {
-	     val count = v.getInt(0) + v.getInt(1)
-	     val p0 = v.getInt(0).toDouble / count
-	     val p1 = v.getInt(1).toDouble / count
+	     val count0 = v.getInt(0)
+	     val count1 = v.getInt(1)
+	     val count = count0 + count1
+	     val p0 = count0.toDouble / count
+	     val p1 = count1.toDouble / count
 	     val info = if (splittingAlgo.equals("entropy")) {
-	       -(p0 * Math.log(p0) + p1 * Math.log(p1))
+	       var info = 0.0
+	       if (count0 > 0) info -=  p0 * Math.log(p0)
+	       if (count1 > 0) info -=  p1 * Math.log(p1)
+	       info
 	     } else {
 	       1.0 - p0 * p0 - p1 * p1
 	     }
+	     if (debugOn)
+	    	 println("count " + count0 + " count " + count1 + " info " + info)
 	     val value = Record(2)
 	     value.addDouble(info)
 	     value.addInt(count)
@@ -111,15 +118,22 @@ object ThresholdLearner extends JobConfiguration {
 	     val key = r._1
 	     val value = r._2
 	     val split = key.getDouble(0)
-	     val part = key.getInt(2)
+	     val part = key.getInt(1)
 	     (split, value)
 	   }).groupByKey.map(r => {
 	     val split = r._1
-	     val partInfo = r._2.toList
+	     val partInfo = r._2.toArray
+	     if (partInfo.size != 2) {
+	       throw new IllegalStateException("num of partions is not 2")
+	     }
 	     val count = (partInfo(0).getInt(1) + partInfo(1).getInt(1)).toDouble
 	     val w0 = partInfo(0).getInt(1) / count
 	     val w1 = partInfo(1).getInt(1) / count
-	     val info = w0 * partInfo(0).getDouble(0) + w1 * partInfo(1).getDouble(0)
+	     val info0 = partInfo(0).getDouble(0)
+	     val info1 = partInfo(1).getDouble(0)
+	     val info = w0 * info0 + w1 * info1
+	     if (debugOn)
+	    	 println("count " + count + " w0 " + w0 + " w1 " + w1 + " info0 " + info0 + " info1 " + info1)
 	     BasicUtils.formatDouble(split, 3) + fieldDelimOut + BasicUtils.formatDouble(info, 6)
 	   })
 	   

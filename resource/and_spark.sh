@@ -80,6 +80,16 @@ case "$1" in
 	cat $PROJECT_HOME/bin/beymani/output/olp/part-00001 >> $PROJECT_HOME/bin/beymani/other/olp/outl.txt
 ;;
 
+"thLearn")
+	echo "running ThresholdLearner Spark job"
+	CLASS_NAME=org.beymani.spark.common.ThresholdLearner
+	INPUT=file:///Users/pranab/Projects/bin/beymani/input/thl/olf.txt
+	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/thl
+	rm -rf ./output/thl
+	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
+	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT and.conf
+;;
+
 
 *) 
 	echo "unknown operation $1"
