@@ -68,5 +68,54 @@ elif op == "anomaly":
 		mrec = ",".join(rec)
 		print mrec
 	#print "num of anomalous records " + str(count)
-	
-	 	
+
+elif op == "feedback":
+	fileName = sys.argv[2]
+	curThreshold = float(sys.argv[3])
+	newThreshold = float(sys.argv[4])
+	margin = curThreshold + 0.6 * (newThreshold - curThreshold)
+	count = 0
+	for rec in fileRecGen(fileName, ","):
+		score = float(rec[4])	
+		label = rec[5]
+		if newThreshold > curThreshold:
+			#false positive
+			if label == "O":
+				if score > newThreshold:
+					flabel = "O"
+					cl = "T"
+				else:
+					if score < margin or isEventSampled(90):
+						flabel = "N"
+						cl = "F"
+						count += 1
+					else:
+						flabel = "O"
+						cl = "T"
+			else:
+				flabel = "N"
+				cl = "F"
+		else:
+			#false negative
+			if label == "O":
+				flabel = "O"
+				cl = "T"
+			else:
+				if score > newThreshold:
+					if score > margin or isEventSampled(90):
+						flabel = "O"
+						cl = "T"
+						count += 1
+					else:
+						flabel = "N"
+						cl = "F"			
+				else:
+					flabel = "N"
+					cl = "F"
+				
+	 	rec.append(flabel)
+	 	rec.append(cl)
+	 	mrec = ",".join(rec)
+		print mrec
+	print count	
+			
