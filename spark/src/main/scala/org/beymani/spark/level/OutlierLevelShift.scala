@@ -59,6 +59,9 @@ object OutlierLevelShift extends JobConfiguration  {
 	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
 	     case None => None  
 	   }
+	   val debugOn = appConfig.getBoolean("debug.on")
+	   val saveOutput = appConfig.getBoolean("save.output")
+
 	   var keyLen = 0
 	   keyFieldOrdinals match {
 	     case Some(fields : Array[Integer]) => keyLen +=  fields.length
@@ -134,6 +137,25 @@ object OutlierLevelShift extends JobConfiguration  {
 	     levelShitfs.toList.map(v => (key, v))
 	   })
 	   
+	   //sort
+	   val sortedLevelShits = levelShits.map(r => {
+	     val key = r._1
+	     val value = r._2
+	     val newKey = Record(key.size+1, key)
+	     newKey.addLong(value.getLong(0))
+	     (newKey, value)
+	   }).sortByKey().map(r => {
+	     r._1.toString(0, r._1.size -1) + fieldDelimOut + r._2.toString()
+	   })
+	   
+	 if (debugOn) {
+         val records = sortedLevelShits.collect
+         records.slice(0, 100).foreach(r => println(r))
+     }
+	   
+	 if(saveOutput) {	   
+	     sortedLevelShits.saveAsTextFile(outputPath) 
+	 }	 
 	   
    }
    
