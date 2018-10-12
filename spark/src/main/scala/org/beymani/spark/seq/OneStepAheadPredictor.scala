@@ -175,6 +175,10 @@ object OneStepAheadPredictor extends JobConfiguration with OutlierUtility {
 	         val range = tDistVal * stdDev * Math.sqrt(1.0 + 1.0 / count)
 	         var score = Math.abs(quantPrediction - quant) / range
 	         score = BasicUtils.expScale(expConst, score);
+	         
+	         //if outlier replace actual with predicted in window
+	         if (score > scoreThreshold)
+	        	 window.replaceRecent(quantPrediction)
 	         score
 	       } else {
 	         0.0
