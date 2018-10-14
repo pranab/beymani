@@ -50,7 +50,18 @@ object ThresholdLearner extends JobConfiguration {
 	   val clsFldOrd = getMandatoryIntParam(appConfig, "cls.fldOrd", "missing class label field ordinal")
 	   val splitPoints = getMandatoryDoubleListParam(appConfig, "split.points", "missing split points").asScala.toList
 	   val posClsLabel = getStringParamOrElse(appConfig, "pos.clsLabel", "T")
-	   val splittingAlgo = this.getStringParamOrElse(appConfig, "splitting.algo", "entropy")
+	   val splittingAlgo = getStringParamOrElse(appConfig, "splitting.algo", "entropy")
+	   val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
+	   val keyFieldOrdinals = keyFields match {
+	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
+	     case None => None  
+	   }
+	   var keyLen = 0
+	   keyFieldOrdinals match {
+	     case Some(fields : Array[Integer]) => keyLen +=  fields.length
+	     case None =>
+	   }
+	   keyLen += 2
 	   
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
@@ -65,7 +76,8 @@ object ThresholdLearner extends JobConfiguration {
 	     val clLabel = items(clsFldOrd)
 	     val recs = splitPoints.map(sp => {
 	       val part = if (score < sp) 0 else 1
-	       val key = Record(2)
+	       val key = Record(keyLen)
+	       Record.populateFields(items, keyFieldOrdinals, key)
 	       key.addDouble(sp)
 	       key.addInt(part)
 	    	   
@@ -117,11 +129,10 @@ object ThresholdLearner extends JobConfiguration {
 	   val splitInfo  = splitRecs.map(r => {
 	     val key = r._1
 	     val value = r._2
-	     val split = key.getDouble(0)
-	     val part = key.getInt(1)
-	     (split, value)
+	     val newKey = Record(key, 0, key.size-1)
+	     (newKey, value)
 	   }).groupByKey.map(r => {
-	     val split = r._1
+	     val key = r._1
 	     val partInfo = r._2.toArray
 	     if (partInfo.size != 2) {
 	       throw new IllegalStateException("num of partions is not 2")
@@ -134,7 +145,7 @@ object ThresholdLearner extends JobConfiguration {
 	     val info = w0 * info0 + w1 * info1
 	     if (debugOn)
 	    	 println("count " + count + " w0 " + w0 + " w1 " + w1 + " info0 " + info0 + " info1 " + info1)
-	     BasicUtils.formatDouble(split, 3) + fieldDelimOut + BasicUtils.formatDouble(info, 6)
+	     key.toString + fieldDelimOut + BasicUtils.formatDouble(info, 6)
 	   })
 	   
 	   if (debugOn) {
