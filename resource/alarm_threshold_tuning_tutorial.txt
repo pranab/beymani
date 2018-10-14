@@ -1,0 +1,41 @@
+This tutorial is for tuning the threshold  in anomaly detection system based on supervised learning
+using user feedback data 
+
+Environment
+===========
+Path etc shown here corresposnds to my environment. Please Change them  as needed  for your 
+environment
+
+Build
+=====
+Follow instructions in spark_dependency.txt
+
+Python dependency
+=================
+The shell script commands for data generation run python scripts for data generation. Before you run 
+the data generation commands do the following
+1. checkout project avenir
+2. copy the avenir/python/lib directory to ../lib with respect to your location of cpu_usage.py file
+
+Generate outlier detected data
+==============================
+Please follow the tutorial cpu_usage_anomaly_det_tutorial.txt to generate data with outliers detected.
+Consolidate Spark generated output files into 1 file
+
+Simulate user feedback
+======================
+./cpu_usage.py feedback <outlier_file_name> <cur_threshold> <new_threshold>
+
+outlier_file_name = file generated in the previous step
+cur_threshold = threshold set outlier detection spark jobs. It's the parameter score.threshold 
+in and.conf file
+new_threshold = if set higher than cur_threshold, it will simulate the case false positive 
+i.e too many alarms
+
+Run spark job
+=============
+./and_spark.sh thLearn
+
+Configuration
+=============
+It's in and.conf file. Through the parameter split.points multiple split points are provided.
