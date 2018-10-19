@@ -92,7 +92,33 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 		   	None
 	   }
 	   
-	   val thresholdNorm = this.getOptionalDoubleParam(appConfig, "score.thresholdNorm")
+	   //soft threshold below actual
+	   val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
+	   
+	   //outlier polarity high, low or both
+	   val outlierPolarity = this.getStringParamOrElse(appConfig, "oullier.polarity", "both")
+	   val meanValues = 
+	   if (!outlierPolarity.equals("both")) {
+	     if (getMandatoryIntListParam(appConfig, "attr.ordinals").size() != 1) {
+	       throw new IllegalStateException("outlier polarity can be applied only for one quant field, found multiple")
+	     }
+	     
+	     val statsPath = getMandatoryStringParam(appConfig, "stats.file.path", "missing stat file path")
+	     var keyLen = 0
+	     keyFieldOrdinals match {
+	     	case Some(fields : Array[Integer]) => keyLen +=  fields.length
+	     	case None =>
+	     }
+	     keyLen += (if (seasonalAnalysis) 2 else 0)
+	     keyLen += 1
+	     val meanFldOrd = keyLen + getMandatoryIntParam(appConfig, "mean.fldOrd","missing mean field ordinal")
+	     BasicUtils.getKeyedValues(statsPath, keyLen, meanFldOrd)
+	   } else {
+	     null
+	   }
+	   //val brMeanValues = sparkCntxt.broadcast(meanValues)
+	   val quantFldOrd = getMandatoryIntListParam(appConfig, "attr.ordinals").get(0).toInt
+	   
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 
@@ -193,7 +219,9 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			   val keyStr = key.toString
 			   val predictor = brPredictor.value
 			   val score:java.lang.Double = predictor.execute(items, keyStr)
-			   val marker = if (score > scoreThreshold) "O"  else "N"
+			   var marker = if (score > scoreThreshold) "O"  else "N"
+			   val keyWithFldOrd = keyStr + fieldDelimIn + quantFldOrd
+			   marker = applyPolarity(items, quantFldOrd, marker, outlierPolarity, keyWithFldOrd, meanValues)
 			   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
 		   }
 	 })
@@ -305,6 +333,31 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   
 	   configParams
    }
-   
 
+   /**
+   * @param config
+   * @param paramName
+   * @param defValue
+   * @param errorMsg
+   * @return
+   */
+   def applyPolarity(items:Array[String], quantFldOrd:Int, label:String, outlierPolarity:String, key:String, 
+       meanValues:java.util.Map[String,java.lang.Double]) : String = {
+	   var newLabel = label
+	   val value = items(quantFldOrd).toDouble
+	   
+	   if (label.equals("O")) {
+	     if (outlierPolarity.equals("high")) {
+	       if (value < meanValues.get(key)) {
+	         newLabel = "N"
+	       }
+	     } else if (outlierPolarity.equals("low")) {
+	       if (value > meanValues.get(key)) {
+	         newLabel = "N"
+	       }
+	     }
+       } 
+       newLabel
+   }
+   
 }
