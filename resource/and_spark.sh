@@ -90,6 +90,16 @@ case "$1" in
 	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT and.conf
 ;;
 
+"tempAggr")
+	echo "running TemporalAggregator Spark job"
+	CLASS_NAME=org.chombo.spark.explore.TemporalAggregator
+	INPUT=file:///Users/pranab/Projects/bin/beymani/input/teg/cusage.txt
+	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/teg
+	rm -rf ./output/teg
+	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
+	--conf spark.ui.killEnabled=true --master $MASTER $CHOMBO_JAR_NAME  $INPUT $OUTPUT and.conf
+;;
+
 
 *) 
 	echo "unknown operation $1"
