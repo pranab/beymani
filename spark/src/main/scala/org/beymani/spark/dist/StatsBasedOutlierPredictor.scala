@@ -96,7 +96,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
 	   
 	   //outlier polarity high, low or both
-	   val outlierPolarity = this.getStringParamOrElse(appConfig, "oullier.polarity", "both")
+	   val outlierPolarity = this.getStringParamOrElse(appConfig, "outlier.polarity", "both")
 	   val meanValues = 
 	   if (!outlierPolarity.equals("both")) {
 	     if (getMandatoryIntListParam(appConfig, "attr.ordinals").size() != 1) {

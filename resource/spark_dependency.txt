@@ -8,6 +8,10 @@ in chombo/spark
 sbt clean package
 sbt publishLocal
 
+in hoidla
+mvn clean install
+sbt publishLocal
+
 in beymani
 mvn clean install
 sbt publishLocal
