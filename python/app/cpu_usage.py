@@ -20,6 +20,12 @@ if op == "usage":
 	numDays = int(sys.argv[2])
 	sampIntv = int(sys.argv[3])
 	numServers = int(sys.argv[4])
+	
+	outDayInWeek = True
+	if len(sys.argv) == 6:
+		if sys.argv[5] == "false" or sys.argv[5] == "f":
+			outDayInWeek = False
+		
 
 	serverList = []
 	for i in range(numServers):
@@ -50,8 +56,11 @@ if op == "usage":
 				usage = 100
 						
 			st = sampTime + randint(-2,2)
-			print "%s,%d,%d,%d" %(server, st, daysIntoWeek, usage)
-		
+			if outDayInWeek:
+				print "%s,%d,%d,%d" %(server, st, daysIntoWeek, usage)
+			else:
+				print "%s,%d,%d" %(server, st, usage)
+				
 		sampTime = sampTime + sampIntv
 	
 elif op == "anomaly":
@@ -117,5 +126,5 @@ elif op == "feedback":
 	 	rec.append(cl)
 	 	mrec = ",".join(rec)
 		print mrec
-	print count	
+	#print count	
 			
