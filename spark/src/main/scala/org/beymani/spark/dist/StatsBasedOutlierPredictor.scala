@@ -163,7 +163,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	  keyLen += (if (seasonalAnalysis && partBySeasonCycle) 1 else 0)
 
 	 var taggedData = data.map(line => {
-		   val items = line.split(fieldDelimIn, -1)
+		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 		   val key = Record(keyLen)
 		   //partioning fields
 		   keyFieldOrdinals match {

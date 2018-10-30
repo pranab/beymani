@@ -34,6 +34,13 @@ case "$1" in
 	--conf spark.ui.killEnabled=true --master $MASTER $CHOMBO_JAR_NAME  $INPUT $OUTPUT cyd.conf
 ;;
 
+"crAucInput")
+	echo "copying and consolidating tem aggregation output file"
+	cat $PROJECT_HOME/bin/beymani/output/teg/part-00000 > $PROJECT_HOME/bin/beymani/input/auc/cusage.txt
+	cat $PROJECT_HOME/bin/beymani/output/teg/part-00001 >> $PROJECT_HOME/bin/beymani/input/auc/cusage.txt
+	ls -l $PROJECT_HOME/bin/beymani/input/auc
+;;
+
 "autoCor")
 	echo "running AutoCorrelation Spark job"
 	CLASS_NAME=org.chombo.spark.explore.AutoCorrelation
