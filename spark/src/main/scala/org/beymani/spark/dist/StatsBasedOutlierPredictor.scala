@@ -31,6 +31,7 @@ import org.chombo.util.SeasonalAnalyzer
 import org.chombo.spark.common.SeasonalUtility
 import org.beymani.predictor.EstimatedProbabilityBasedPredictor
 import org.beymani.predictor.EsimatedAttrtibuteProbabilityBasedPredictor
+import org.apache.spark.Accumulator
 
 object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility {
    private val predStrategyZscore = "zscore";
@@ -112,6 +113,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     keyLen += (if (seasonalAnalysis) 2 else 0)
 	     keyLen += 1
 	     val meanFldOrd = keyLen + getMandatoryIntParam(appConfig, "mean.fldOrd","missing mean field ordinal")
+	     //println("keyLen " + keyLen + " meanFldOrd " + meanFldOrd)
 	     BasicUtils.getKeyedValues(statsPath, keyLen, meanFldOrd)
 	   } else {
 	     null
@@ -147,6 +149,10 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   
 	 //broadcast validator
 	 val brPredictor = sparkCntxt.broadcast(predictor)
+	 
+	 //counters
+	 val lowIgnoredCounter = sparkCntxt.accumulator(0)
+	 val highIgnoredCounter = sparkCntxt.accumulator(0)
 	   
 	 //input
 	 val data = sparkCntxt.textFile(inputPath)
@@ -221,7 +227,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			   val score:java.lang.Double = predictor.execute(items, keyStr)
 			   var marker = if (score > scoreThreshold) "O"  else "N"
 			   val keyWithFldOrd = keyStr + fieldDelimIn + quantFldOrd
-			   marker = applyPolarity(items, quantFldOrd, marker, outlierPolarity, keyWithFldOrd, meanValues)
+			   marker = applyPolarity(items, quantFldOrd, marker, outlierPolarity, keyWithFldOrd, meanValues, 
+			       lowIgnoredCounter, highIgnoredCounter)
 			   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
 		   }
 	 })
@@ -257,7 +264,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     case None => taggedData
 	   }
 	 }
-	  
+	 
+
 	 if (debugOn) {
          val records = taggedData.collect
          records.slice(0, 100).foreach(r => println(r))
@@ -267,6 +275,9 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     taggedData.saveAsTextFile(outputPath) 
 	 }	 
 	 
+	 println("** counters **")
+	 println("low value ignored counter " + lowIgnoredCounter.value)
+	 println("high value ignored counter " + highIgnoredCounter.value)
    }
    
       /**
@@ -342,7 +353,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    * @return
    */
    def applyPolarity(items:Array[String], quantFldOrd:Int, label:String, outlierPolarity:String, key:String, 
-       meanValues:java.util.Map[String,java.lang.Double]) : String = {
+       meanValues:java.util.Map[String,java.lang.Double], lowIgnoredCounter:Accumulator[Int], highIgnoredCounter:Accumulator[Int]) : String = {
 	   var newLabel = label
 	   val value = items(quantFldOrd).toDouble
 	   
@@ -350,10 +361,12 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     if (outlierPolarity.equals("high")) {
 	       if (value < meanValues.get(key)) {
 	         newLabel = "N"
+	         lowIgnoredCounter += 1
 	       }
 	     } else if (outlierPolarity.equals("low")) {
 	       if (value > meanValues.get(key)) {
 	         newLabel = "N"
+	         highIgnoredCounter += 1
 	       }
 	     }
        } 
