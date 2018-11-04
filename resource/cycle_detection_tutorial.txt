@@ -1,0 +1,60 @@
+This tutorial is for cycle detection in time series data using auto correlation. A set of 
+candidate lags are provided. The lag with the highest correlation corresponds to a cycle.
+ 
+
+Environment
+===========
+Path etc shown here corresposnds to my environment. Please Change them  as needed  for your 
+environment
+
+Build
+=====
+Follow instructions in spark_dependency.txt
+
+Python dependency
+=================
+The shell script commands for data generation run python scripts for data generation. Before you run 
+the data generation commands do the following
+1. checkout project avenir
+2. copy the avenir/python/lib directory to ../lib with respect to your location of cpu_usage.py file
+
+Create input data
+=================
+./and_spark.sh crInput <num_of_days> <reading_intervaL> <num_servers> <output_file>
+
+where
+num_of_days = number of days e.g 15
+reading_intervaL = reading interval in sec e.g. 300
+num_servers = number of servers e.g. 4
+output_file = output file, we will use c.txt from now on
+
+Copy output to input path for NumericalAttrStats and TemporalAggregator spark jobs
+
+Run Spark job for stats
+=======================
+./cyd.sh numStat
+
+Copy and consolidate stats file
+===============================
+./and_spark.sh crStatsFile
+
+Aggregate to hourly
+===================
+If the sampling interval is in minutes or sec aggregate to hourly average
+./cyd.sh tempAggr
+
+Copy and consolidate aggregate output
+=====================================
+./cyd.sh crAucInput
+
+Run Spark job for auto correlation
+==================================
+./cyd.sh autoCor
+
+Configuration
+=============
+Configuration is in cyd.conf. Make changes as necessary
+
+
+
+
