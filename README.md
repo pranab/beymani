@@ -1,7 +1,6 @@
 ## Introduction
-Beymani consists of set of Hadoop and Storm based tools for outlier and anamoly 
-detection, which can be used for fraud detection, intrusion detection. All the 
-implementations will be ported to Spark.
+Beymani consists of set of Hadoop, Spark and Storm based tools for outlier and anamoly 
+detection, which can be used for fraud detection, intrusion detection. 
 
 ## Philosophy
 * Simple to use
@@ -16,7 +15,7 @@ The following blogs of mine are good source of details of beymani
 * http://pkghosh.wordpress.com/2012/06/18/its-a-lonely-life-for-outliers/
 * http://pkghosh.wordpress.com/2012/10/18/relative-density-and-outliers/
 * http://pkghosh.wordpress.com/2013/10/21/real-time-fraud-detection-with-sequence-mining/
-* pkghosh.wordpress.com/2018/09/18/contextual-outlier-detection-with-statistical-modeling-on-spark/
+* https://pkghosh.wordpress.com/2018/09/18/contextual-outlier-detection-with-statistical-modeling-on-spark/
 * https://pkghosh.wordpress.com/2018/10/15/learning-alarm-threshold-from-user-feedback-using-decision-tree-on-spark/
 
 ## Algorithms
@@ -43,6 +42,11 @@ For Hadoop 2 (non yarn)
 For Hadoop 2 (yarn)
 * git checkout nuovo
 * mvn clean install -P yarn
+
+For Spark
+* mvn clean install
+* sbt publishLocal
+* in ./spark  sbt clean package
 
 ## Help
 Please feel free to email me at pkghosh99@gmail.com
