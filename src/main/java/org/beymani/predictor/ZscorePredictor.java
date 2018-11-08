@@ -171,8 +171,12 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 			double val = Double.parseDouble(items[ord]);
 			if (null != idOrdinals) {
 				if (statsManager.statsExists(compKey, ord)) {
-					score += (Math.abs( val - statsManager.getMean(compKey,ord)) / 
-							statsManager.getStdDev(compKey, ord)) * attrWeights[i];
+					double thisScore = 0;
+					if (statsManager.getStdDev(compKey, ord) > 0) {
+						thisScore = (Math.abs( val - statsManager.getMean(compKey,ord)) / 
+								statsManager.getStdDev(compKey, ord)) * attrWeights[i];
+					} 
+					score += thisScore;
 				} else {
 					if (!ignoreMissingStat) {
 						throw new IllegalStateException("missing stats for key " + compKey + " field " + ord);

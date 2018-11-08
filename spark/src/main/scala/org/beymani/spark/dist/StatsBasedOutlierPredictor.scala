@@ -155,6 +155,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   //counters
 	   val lowIgnoredCounter = sparkCntxt.accumulator(0)
 	   val highIgnoredCounter = sparkCntxt.accumulator(0)
+	   val invalidScoreCounter = sparkCntxt.accumulator(0)
 	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
@@ -231,6 +232,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			   if (!predictor.isValid(keyStr))  {
 			     //invalid prediction because of missing stats
 			     marker = "I"
+			     invalidScoreCounter += 1
 			   }
 			   val keyWithFldOrd = keyStr + fieldDelimIn + quantFldOrd
 			   marker = applyPolarity(items, quantFldOrd, marker, outlierPolarity, keyWithFldOrd, meanValues, 
@@ -284,6 +286,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	 println("** counters **")
 	 println("low value ignored counter " + lowIgnoredCounter.value)
 	 println("high value ignored counter " + highIgnoredCounter.value)
+	 println("invalid score counter " + invalidScoreCounter.value)
    }
    
       /**
