@@ -358,5 +358,11 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		params[0] = entropyWoTragetState / entropy;
 		params[1] = 1;
 	}
+
+	@Override
+	public boolean isValid(String compKey) {
+		// TODO Auto-generated method stub
+		return true;
+	}
 	
 }

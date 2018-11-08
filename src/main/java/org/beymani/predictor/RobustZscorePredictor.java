@@ -174,5 +174,11 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;
 		
+	}
+
+	@Override
+	public boolean isValid(String compKey) {
+		// TODO Auto-generated method stub
+		return true;
 	}	
 }

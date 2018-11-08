@@ -146,29 +146,31 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold")
 	   }
 	   
+	   val ignoreMissingStat = getBooleanParamOrElse(appConfig, "ignore.missingStat", false)
+	   predictor.withIgnoreMissingStat(ignoreMissingStat)
 	   
-	 //broadcast validator
-	 val brPredictor = sparkCntxt.broadcast(predictor)
+	   //broadcast validator
+	   val brPredictor = sparkCntxt.broadcast(predictor)
 	 
-	 //counters
-	 val lowIgnoredCounter = sparkCntxt.accumulator(0)
-	 val highIgnoredCounter = sparkCntxt.accumulator(0)
+	   //counters
+	   val lowIgnoredCounter = sparkCntxt.accumulator(0)
+	   val highIgnoredCounter = sparkCntxt.accumulator(0)
 	   
-	 //input
-	 val data = sparkCntxt.textFile(inputPath)
-	 if (remOutliers)
-	   data.cache
+	   //input
+	   val data = sparkCntxt.textFile(inputPath)
+	   if (remOutliers)
+	     data.cache
 	   
-	 //predict for each field in each line whether it's an outlier
-	  var keyLen = 0
-	  keyFieldOrdinals match {
-	    case Some(fields : Array[Integer]) => keyLen +=  fields.length
-	    case None =>
-	  }
-	  keyLen += (if (seasonalAnalysis) 1 else 0)
-	  keyLen += (if (seasonalAnalysis && partBySeasonCycle) 1 else 0)
+	   //predict for each field in each line whether it's an outlier
+	   var keyLen = 0
+	   keyFieldOrdinals match {
+	      case Some(fields : Array[Integer]) => keyLen +=  fields.length
+	      case None =>
+	   }
+	   keyLen += (if (seasonalAnalysis) 1 else 0)
+	   keyLen += (if (seasonalAnalysis && partBySeasonCycle) 1 else 0)
 
-	 var taggedData = data.map(line => {
+	   var taggedData = data.map(line => {
 		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 		   val key = Record(keyLen)
 		   //partioning fields
@@ -226,44 +228,48 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			   val predictor = brPredictor.value
 			   val score:java.lang.Double = predictor.execute(items, keyStr)
 			   var marker = if (score > scoreThreshold) "O"  else "N"
+			   if (!predictor.isValid(keyStr))  {
+			     //invalid prediction because of missing stats
+			     marker = "I"
+			   }
 			   val keyWithFldOrd = keyStr + fieldDelimIn + quantFldOrd
 			   marker = applyPolarity(items, quantFldOrd, marker, outlierPolarity, keyWithFldOrd, meanValues, 
 			       lowIgnoredCounter, highIgnoredCounter)
 			   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
 		   }
-	 })
+	   })
 	 
-	 if (outputOutliers || remOutliers) {
-	   taggedData = taggedData.filter(line => {
+	   if (outputOutliers || remOutliers) {
+	     taggedData = taggedData.filter(line => {
 		   val items = line.split(fieldDelimIn, -1)
 		   val marker = items(items.length - 1)
 		   marker.equals("O")
-	   })
-	   if (remOutliers) {
-	     //additional output for input with outliers subtracted
-	     taggedData = taggedData.map(line => {
-		   val items = line.split(fieldDelimIn, -1)
-	       val ar = items.slice(0, items.length - 2)
-	       ar.mkString(fieldDelimOut)
-	     })
-	     
-	     //remove outliers records
-	     val cleanData =  data.subtract(taggedData)
-	     cleanData.saveAsTextFile(cleanDataDirPath) 
-	   }
-	 } else {
-	   //all or only records above a threshold
-	   taggedData =  thresholdNorm match {
-	     case Some(threshold:Double) => {
-	       taggedData.filter(line => {
-	         val items = line.split(fieldDelimIn, -1)
-	         val score = items(items.length - 2).toDouble
-	         score > threshold
 	       })
+	     if (remOutliers) {
+	       //additional output for input with outliers subtracted
+	       taggedData = taggedData.map(line => {
+		     val items = line.split(fieldDelimIn, -1)
+	         val ar = items.slice(0, items.length - 2)
+	         ar.mkString(fieldDelimOut)
+	       })
+	     
+	       //remove outliers records
+	       val cleanData =  data.subtract(taggedData)
+	       cleanData.saveAsTextFile(cleanDataDirPath) 
 	     }
-	     case None => taggedData
+	   } else {
+	     //all or only records above a threshold
+	     taggedData =  thresholdNorm match {
+	       case Some(threshold:Double) => {
+	         taggedData.filter(line => {
+	           val items = line.split(fieldDelimIn, -1)
+	           val score = items(items.length - 2).toDouble
+	           score > threshold
+	         })
+	       }
+	       case None => taggedData
+	     }
 	   }
-	 }
 	 
 
 	 if (debugOn) {

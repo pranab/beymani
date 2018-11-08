@@ -88,4 +88,10 @@ public class EstimatedProbabilityBasedPredictor extends DistributionBasedPredict
 		double score = 1.0 - pr;
 		return score;
 	}
+
+	@Override
+	public boolean isValid(String compKey) {
+		// TODO Auto-generated method stub
+		return true;
+	}
 }

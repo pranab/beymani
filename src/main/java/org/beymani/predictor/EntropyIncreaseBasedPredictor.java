@@ -83,5 +83,11 @@ public class EntropyIncreaseBasedPredictor extends DistributionBasedPredictor {
 		
 		return score;
 	}
+
+	@Override
+	public boolean isValid(String compKey) {
+		// TODO Auto-generated method stub
+		return true;
+	}
 	
 }

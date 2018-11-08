@@ -33,6 +33,7 @@ public abstract class ModelBasedPredictor implements Serializable {
 	protected int[] idOrdinals;
 	protected int[] attrOrdinals;
 	protected double[] attrWeights;
+	protected boolean ignoreMissingStat;
 
 	/**
 	 * @param entityID
@@ -63,4 +64,21 @@ public abstract class ModelBasedPredictor implements Serializable {
 		partition = true;
 		return this;
 	}
+
+	/**
+	 * @param ignoreMissingStat
+	 * @return
+	 */
+	public ModelBasedPredictor withIgnoreMissingStat(boolean ignoreMissingStat) {
+		this.ignoreMissingStat = ignoreMissingStat;
+		return this;
+	}
+
+	
+	/**
+	 * @param compKey
+	 * @return
+	 */
+	public abstract boolean isValid(String compKey);
+	
 }

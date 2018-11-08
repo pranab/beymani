@@ -125,6 +125,9 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	}
 	
 
+	/* (non-Javadoc)
+	 * @see org.beymani.predictor.ModelBasedPredictor#execute(java.lang.String, java.lang.String)
+	 */
 	@Override
 	public double execute(String entityID, String record) {
 		double score = 0;
@@ -155,6 +158,9 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		return score;
 	}
 
+	/* (non-Javadoc)
+	 * @see org.beymani.predictor.ModelBasedPredictor#execute(java.lang.String[], java.lang.String)
+	 */
 	@Override
 	public double execute(String[] items, String compKey) {
 		double score = 0;
@@ -164,7 +170,14 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		for (int ord  :  attrOrdinals) {
 			double val = Double.parseDouble(items[ord]);
 			if (null != idOrdinals) {
-				score  += (Math.abs( val - statsManager.getMean(compKey,ord)) / statsManager.getStdDev(compKey, ord)) * attrWeights[i];
+				if (statsManager.statsExists(compKey, ord)) {
+					score += (Math.abs( val - statsManager.getMean(compKey,ord)) / 
+							statsManager.getStdDev(compKey, ord)) * attrWeights[i];
+				} else {
+					if (!ignoreMissingStat) {
+						throw new IllegalStateException("missing stats for key " + compKey + " field " + ord);
+					}
+				}
 			} else {
 				score  += (Math.abs( val - statsManager.getMean(ord)) / statsManager.getStdDev(ord)) * attrWeights[i];
 			}
@@ -178,6 +191,21 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;
+	}
+	
+	/* (non-Javadoc)
+	 * @see org.beymani.predictor.ModelBasedPredictor#isValid(java.lang.String)
+	 */
+	@Override
+	public boolean isValid(String compKey) {
+		boolean valid = true;
+		for (int ord  :  attrOrdinals) {
+			if (!statsManager.statsExists(compKey, ord)) {
+				valid = false;
+				break;
+			}
+		}		
+		return valid;
 	}
 
 }
