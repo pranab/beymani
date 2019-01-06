@@ -26,7 +26,7 @@ import org.chombo.util.BaseAttribute
 import com.typesafe.config.Config
 import org.hoidla.window.SizeBoundPredictorWindow
 import org.chombo.stats.SimpleStat
-import org.chombo.util.MathUtils
+import org.chombo.math.MathUtils
 import org.beymani.spark.common.OutlierUtility
 
 /**
