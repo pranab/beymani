@@ -328,6 +328,15 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       val statsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.file.path", "missing stat file path")
 	       configParams.put("stats.filePath", statsFilePath)
 	     }
+	     case `predStrategyRobustZscore` => {
+	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
+	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
+	       configParams.put("attr.weights", attrWeights)
+	       val medStatsFilePath = getMandatoryStringParam(appAlgoConfig, "med.stats.file.path", "missing median stat file path")
+	       configParams.put("stats.medFilePath", medStatsFilePath)
+	       val madStatsFilePath = getMandatoryStringParam(appAlgoConfig, "mad.stats.file.path", "missing mad stat file path")
+	       configParams.put("stats.madFilePath", madStatsFilePath)
+	     }
 	     case `predStrategyExtremeValueProb` => {
 	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
 	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
