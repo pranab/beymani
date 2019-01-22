@@ -32,8 +32,9 @@ import org.chombo.spark.common.SeasonalUtility
 import org.beymani.predictor.EstimatedProbabilityBasedPredictor
 import org.beymani.predictor.EsimatedAttrtibuteProbabilityBasedPredictor
 import org.apache.spark.Accumulator
+import org.chombo.spark.common.GeneralUtility
 
-object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility {
+object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility with GeneralUtility{
    private val predStrategyZscore = "zscore";
    private val predStrategyRobustZscore = "robustZscore";
    private val predStrategyEstProb = "estimatedProbablity";
@@ -55,7 +56,12 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   //configuration params
 	   val fieldDelimIn = appConfig.getString("field.delim.in")
 	   val fieldDelimOut = appConfig.getString("field.delim.out")
-	   val predictorStrategy = getStringParamOrElse(appConfig, "predictor.strategy", predStrategyZscore)
+	   
+	   val predictorStrategy = getMandatoryStringParam(appConfig, "predictor.strategy", "missing prediction strategy")
+	   val predictorStrategies = Array[String]("zscore", "robustZscore", "estimatedProbablity", 
+	       "estimatedAttributeProbablity", "extremeValueProbablity")
+	   assertStringMember(predictorStrategy, predictorStrategies, "invalid prediction strategy " + predictorStrategy)
+
 	   val appAlgoConfig = appConfig.getConfig(predictorStrategy)
 	   val algoConfig = getConfig(predictorStrategy, appConfig, appAlgoConfig)
 	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
@@ -353,10 +359,12 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       configParams.put("schema.filePath", schemaFilePath)
 	     }
 	     case `predStrategyEstAttrProb` => {
+	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
+	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
+	       configParams.put("attr.weights", attrWeights)
 	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
 	       configParams.put("distr.filePath", distrFilePath)
-	       val schemaFilePath = getMandatoryStringParam(appAlgoConfig, "schema.file.path", "missing schema file path")
-	       configParams.put("schema.filePath", schemaFilePath)
+	       configParams.put("schema.filePath", null)
 	     }
 	   }
 	   

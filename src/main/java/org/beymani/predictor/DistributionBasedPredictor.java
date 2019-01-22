@@ -151,6 +151,7 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	 */
 	
 	/**
+	 * uni variate distribution
 	 * @param config
 	 * @param idOrdinalsParam
 	 * @param distrFilePathParam
@@ -187,15 +188,23 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 			this.keyedHist.put(compKey, keyedHist.get(key));
 		}
 		
-       	String schemFilePath = ConfigUtility.getString(config, schemaFilePathParam);
-    	schema = BasicUtils.getRichAttributeSchema(schemFilePath);
+		if (null != config.get(schemaFilePathParam)) {
+			String schemFilePath = ConfigUtility.getString(config, schemaFilePathParam);
+       		schema = BasicUtils.getRichAttributeSchema(schemFilePath);
+		}
     	scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 	}
 
 	/**
 	 * for multi variate distribution
 	 * @param config
-	 * @param distrFilePath
+	 * @param idOrdinalsParam
+	 * @param distrFilePathParam
+	 * @param hdfsFileParam
+	 * @param schemaFilePathParam
+	 * @param seasonalParam
+	 * @param fieldDelimParam
+	 * @param scoreThresholdParam
 	 * @throws IOException
 	 */
 	public DistributionBasedPredictor(Map<String, Object> config, String idOrdinalsParam, String distrFilePathParam, 
