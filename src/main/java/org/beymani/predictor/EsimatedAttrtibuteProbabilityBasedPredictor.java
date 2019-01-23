@@ -172,10 +172,12 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		double score = 0;
 		int i = 0;
 		double totalWt = 0;
-		//System.out.println("execute compKey " + compKey);
+		System.out.println("execute compKey " + compKey);
 		for (int ord  :  attrOrdinals) {
+			String keyWithFldOrd = compKey + fieldDelim + ord;
 			double val = Double.parseDouble(items[ord]);
-			HistogramStat hist = keyedHist.get(compKey);
+			System.out.println("keyWithFldOrd " + keyWithFldOrd);
+			HistogramStat hist = keyedHist.get(keyWithFldOrd);
 			double distr = hist.findDistr(val);
 			score += (1.0 - distr) * attrWeights[i];
 			totalWt += attrWeights[i];

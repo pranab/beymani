@@ -55,6 +55,7 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected RichAttributeSchema schema;
 	protected StringBuilder stBld = new StringBuilder();
 	protected String subFieldDelim = ";";
+	protected String fieldDelim;
 	protected boolean seasonal;
 
 	/**
@@ -180,11 +181,10 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 		int keyLen = idOrdinals.length;
 		keyLen += (seasonal ? 2 : 0);
 		++keyLen;
-		String delim = ConfigUtility.getString(config, fieldDelimParam, ",");
-
+		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
 		Map<String[], HistogramStat> keyedHist = HistogramUtility.createHiostograms(fs,  keyLen, false);
 		for (String[] key : keyedHist.keySet()) {
-			String compKey = BasicUtils.join(key, delim);
+			String compKey = BasicUtils.join(key, fieldDelim);
 			this.keyedHist.put(compKey, keyedHist.get(key));
 		}
 		

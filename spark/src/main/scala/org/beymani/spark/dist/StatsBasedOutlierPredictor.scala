@@ -148,7 +148,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	      "score.threshold")
        	
        	  case `predStrategyEstAttrProb` => new EsimatedAttrtibuteProbabilityBasedPredictor(algoConfig, 
-       	    "id.fieldOrdinals", "attr.ordinals","distr.file.path", "hdfs.file", "schema.file.path", 
+       	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
        	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold")
 	   }
 	   
@@ -174,8 +174,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	      case Some(fields : Array[Integer]) => keyLen +=  fields.length
 	      case None =>
 	   }
-	   keyLen += (if (seasonalAnalysis) 1 else 0)
-	   keyLen += (if (seasonalAnalysis && partBySeasonCycle) 1 else 0)
+	   keyLen += (if (seasonalAnalysis) 2 else 0)
 
 	   var taggedData = data.map(line => {
 		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
