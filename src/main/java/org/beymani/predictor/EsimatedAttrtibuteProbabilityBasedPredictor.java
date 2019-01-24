@@ -172,7 +172,6 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		double score = 0;
 		int i = 0;
 		double totalWt = 0;
-		System.out.println("execute compKey " + compKey);
 		for (int ord  :  attrOrdinals) {
 			String keyWithFldOrd = compKey + fieldDelim + ord;
 			double val = Double.parseDouble(items[ord]);

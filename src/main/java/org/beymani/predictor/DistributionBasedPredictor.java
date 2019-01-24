@@ -182,7 +182,7 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 		keyLen += (seasonal ? 2 : 0);
 		++keyLen;
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
-		Map<String[], HistogramStat> keyedHist = HistogramUtility.createHiostograms(fs,  keyLen, false);
+		Map<String[], HistogramStat> keyedHist = HistogramStat.createHistograms(fs,  keyLen, false);
 		for (String[] key : keyedHist.keySet()) {
 			String compKey = BasicUtils.join(key, fieldDelim);
 			this.keyedHist.put(compKey, keyedHist.get(key));
