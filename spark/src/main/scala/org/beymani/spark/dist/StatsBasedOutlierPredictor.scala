@@ -101,11 +101,12 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   
 	   //soft threshold below actual
 	   val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
-	   
+	     
 	   //outlier polarity high, low or both
-	   val outlierPolarity = this.getStringParamOrElse(appConfig, "outlier.polarity", "both")
-	   val meanValues = 
-	   if (!outlierPolarity.equals("both")) {
+	   val applyPolarity = getBooleanParamOrElse(appConfig, "apply.polarity", false)
+	   val outlierPolarity = getStringParamOrElse(appConfig, "outlier.polarity", "both")
+	   val statValues = 
+	   if (applyPolarity) {
 	     if (getMandatoryIntListParam(appConfig, "attr.ordinals").size() != 1) {
 	       throw new IllegalStateException("outlier polarity can be applied only for one quant field, found multiple")
 	     }
@@ -118,12 +119,17 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     }
 	     keyLen += (if (seasonalAnalysis) 2 else 0)
 	     keyLen += 1
-	     val meanFldOrd = keyLen + getMandatoryIntParam(appConfig, "mean.fldOrd","missing mean field ordinal")
+	     val meanFldOrd = keyLen + getIntParamOrElse(appConfig, "mean.fldOrd",4)
+	     val stdDevFieldOrd = keyLen + getIntParamOrElse(appConfig, "stdDev.fldOrd",6)
 	     //println("keyLen " + keyLen + " meanFldOrd " + meanFldOrd)
-	     BasicUtils.getKeyedValues(statsPath, keyLen, meanFldOrd)
+	     val meanMap = BasicUtils.getKeyedValues(statsPath, keyLen, meanFldOrd)
+	     val stdDevMap = BasicUtils.getKeyedValues(statsPath, keyLen, stdDevFieldOrd)
+	     (meanMap, stdDevMap)
 	   } else {
 	     null
 	   }
+	   val stdDevMult = getDoubleParamOrElse(appConfig, "stdDev.mult", 0)
+	   
 	   //val brMeanValues = sparkCntxt.broadcast(meanValues)
 	   val quantFldOrd = getMandatoryIntListParam(appConfig, "attr.ordinals").get(0).toInt
 	   
@@ -161,6 +167,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   //counters
 	   val lowIgnoredCounter = sparkCntxt.accumulator(0)
 	   val highIgnoredCounter = sparkCntxt.accumulator(0)
+	   val noIgnoredCounter = sparkCntxt.accumulator(0)
 	   val invalidScoreCounter = sparkCntxt.accumulator(0)
 	   
 	   //input
@@ -240,9 +247,16 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			     invalidScoreCounter += 1
 			   }
 			   val keyWithFldOrd = keyStr + fieldDelimIn + quantFldOrd
-			   marker = applyPolarity(items, quantFldOrd, marker, outlierPolarity, keyWithFldOrd, meanValues, 
-			       lowIgnoredCounter, highIgnoredCounter)
-			   line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
+			   
+			   marker = if (applyPolarity) {
+				   val mValues = statValues._1
+				   val sdValues = statValues._2
+				   applyPolarityToOutlier(items, quantFldOrd, marker, outlierPolarity, keyWithFldOrd, mValues, 
+				       sdValues, stdDevMult, lowIgnoredCounter, highIgnoredCounter, noIgnoredCounter)
+			   } else {
+			     marker
+			   }
+			  line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker
 		   }
 	   })
 	 
@@ -377,22 +391,31 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    * @param errorMsg
    * @return
    */
-   def applyPolarity(items:Array[String], quantFldOrd:Int, label:String, outlierPolarity:String, key:String, 
-       meanValues:java.util.Map[String,java.lang.Double], lowIgnoredCounter:Accumulator[Int], highIgnoredCounter:Accumulator[Int]) : String = {
+   def applyPolarityToOutlier(items:Array[String], quantFldOrd:Int, label:String, outlierPolarity:String, key:String, 
+       meanValues:java.util.Map[String,java.lang.Double], stdDevValues:java.util.Map[String,java.lang.Double], stdDevMult:Double,
+       lowIgnoredCounter:Accumulator[Int], highIgnoredCounter:Accumulator[Int], noIgnoredCounter:Accumulator[Int]) : String = {
 	   var newLabel = label
 	   val value = items(quantFldOrd).toDouble
+	   val hiThreshold = meanValues.get(key) + stdDevMult * stdDevValues.get(key)
+	   val loThreshold = meanValues.get(key) - stdDevMult * stdDevValues.get(key)
 	   
 	   if (label.equals("O")) {
 	     if (outlierPolarity.equals("high")) {
-	       if (value < meanValues.get(key)) {
+	       if (value < hiThreshold) {
 	         newLabel = "N"
 	         lowIgnoredCounter += 1
 	       }
 	     } else if (outlierPolarity.equals("low")) {
-	       if (value > meanValues.get(key)) {
+	       if (value > loThreshold) {
 	         newLabel = "N"
 	         highIgnoredCounter += 1
 	       }
+	     } else {
+	       if (value > loThreshold && value < hiThreshold) {
+	         newLabel = "N"
+	         noIgnoredCounter += 1
+	       }
+	       
 	     }
        } 
        newLabel
