@@ -81,7 +81,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	 */
 	public ZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, String fieldDelimParam, 
 			String attrWeightParam, String statsFilePathParam, String seasonalParam,String hdfsFileParam, 
-			String scoreThresholdParam, String expConstParam) 
+			String scoreThresholdParam, String expConstParam, String ignoreMissingStatParam) 
 		throws IOException {
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
@@ -100,6 +100,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 		realTimeDetection = true;
 		expConst = ConfigUtility.getDouble(config, expConstParam);
+		ignoreMissingStat = ConfigUtility.getBoolean(config, ignoreMissingStatParam);
 	}
 	
 	/**

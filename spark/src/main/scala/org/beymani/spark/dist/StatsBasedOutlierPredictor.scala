@@ -139,7 +139,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val predictor = predictorStrategy match {
        	  case `predStrategyZscore` => new ZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold",
-       	    "exp.const")
+       	    "exp.const", "ignore.missingModel")
          
        	  case `predStrategyExtremeValueProb` => new ExtremeValuePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold",
@@ -147,7 +147,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 
        	  case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	     "stats.medFilePath", "stats.madFilePath", "field.delim.in", "attr.weights","seasonal.analysis",
-       	     "hdfs.file", "exp.const","score.threshold");
+       	     "hdfs.file", "exp.const","score.threshold", "ignore.missingModel");
      
        	  case `predStrategyEstProb` => new EstimatedProbabilityBasedPredictor(algoConfig, "id.fieldOrdinals", 
        	     "distr.file.path", "hdfs.file", "schema.file.path", "seasonal.analysis", "field.delim.in", 
@@ -155,7 +155,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	
        	  case `predStrategyEstAttrProb` => new EsimatedAttrtibuteProbabilityBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
-       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold")
+       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel")
 	   }
 	   
 	   val ignoreMissingStat = getBooleanParamOrElse(appConfig, "ignore.missingStat", false)
@@ -242,15 +242,16 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			   val score:java.lang.Double = predictor.execute(items, keyStr)
 			   var marker = if (score > scoreThreshold) "O"  else "N"
 			   if (!predictor.isValid(keyStr))  {
-			     //invalid prediction because of missing stats
+			     //invalid prediction because of missing model
 			     marker = "I"
 			     invalidScoreCounter += 1
 			   }
-			   val keyWithFldOrd = keyStr + fieldDelimIn + quantFldOrd
 			   
-			   marker = if (applyPolarity) {
+			   marker = 
+			   if (applyPolarity && !marker.equals("I")) {
 				   val mValues = statValues._1
 				   val sdValues = statValues._2
+				   val keyWithFldOrd = keyStr + fieldDelimIn + quantFldOrd
 				   applyPolarityToOutlier(items, quantFldOrd, marker, outlierPolarity, keyWithFldOrd, mValues, 
 				       sdValues, stdDevMult, lowIgnoredCounter, highIgnoredCounter, noIgnoredCounter)
 			   } else {
@@ -328,17 +329,20 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   configParams.put("field.delim.in", fieldDelimIn)
 
 	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
-	   configParams.put("score.threshold", scoreThreshold);
+	   configParams.put("score.threshold", scoreThreshold)
 	   
 	   val seasonalAnalysis:java.lang.Boolean = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
-	   configParams.put("seasonal.analysis", seasonalAnalysis);
+	   configParams.put("seasonal.analysis", seasonalAnalysis)
 	   
 	   val expConst :java.lang.Double = getDoubleParamOrElse(appConfig, "exp.const", 1.0)
-	   configParams.put("exp.const", expConst);
+	   configParams.put("exp.const", expConst)
 	   
 	   val isHdfsFile = getBooleanParamOrElse(appConfig, "hdfs.file", false)
 	   configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
 	   
+	   val ignoreMissingModel = getBooleanParamOrElse(appConfig, "ignore.missingModel", true)
+	   configParams.put("ignore.missingModel", new java.lang.Boolean(ignoreMissingModel))
+	       
 	   predictorStrategy match {
 	     case `predStrategyZscore` => {
 	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")

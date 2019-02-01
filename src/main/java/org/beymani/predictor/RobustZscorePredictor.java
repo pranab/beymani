@@ -39,6 +39,7 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	private double[] attrWeights;
 	protected MessageQueue outQueue;
 	protected Cache cache;
+	private boolean seasonal;
 	
 	/**
 	 * Storm usage
@@ -87,19 +88,20 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	 */
 	public RobustZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, 
 			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam, 
-			String seasonalParam, String hdfsFileParam, String expConstParam, String scoreThresholdParam) throws IOException {
+			String seasonalParam, String hdfsFileParam, String expConstParam, String scoreThresholdParam, String ignoreMissingStatParam) throws IOException {
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
 		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
 		String medFilePath = ConfigUtility.getString(config, medFilePathParam);
 		String madFilePath = ConfigUtility.getString(config, medFilePathParam);
-		boolean seasonal = ConfigUtility.getBoolean(config, seasonalParam);
+		seasonal = ConfigUtility.getBoolean(config, seasonalParam);
 		medStatManager = new MedianStatsManager(config, medFilePath, madFilePath, fieldDelim,  idOrdinals, hdfsFilePath,  seasonal);
 		
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		expConst = ConfigUtility.getDouble(config, expConstParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
+		ignoreMissingStat = ConfigUtility.getBoolean(config, ignoreMissingStatParam);
 	}
 
 	/**
@@ -137,6 +139,7 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 			double val = Double.parseDouble(items[ord]);
 			if (null != idOrdinals) {
 				String compKey = Utility.join(items, idOrdinals, fieldDelim);
+				medStatManager.getKeyedMedian(compKey, ord);
 				score  += (Math.abs( val - medStatManager.getKeyedMedian(compKey, ord) ) / 
 						medStatManager.getKeyedMedAbsDivergence(compKey, ord)) * attrWeights[i];
 			}	else {
@@ -160,8 +163,15 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 		for (int ord  :  attrOrdinals) {
 			double val = Double.parseDouble(items[ord]);
 			if (null != idOrdinals) {
-				score  += (Math.abs( val - medStatManager.getKeyedMedian(compKey, ord) ) / 
-						medStatManager.getKeyedMedAbsDivergence(compKey, ord)) * attrWeights[i];
+				Map<Integer, Double> allMedians = medStatManager.getAllKeyedMedian(compKey);
+				if (null != allMedians) {
+					score  += (Math.abs( val - medStatManager.getKeyedMedian(compKey, ord) ) / 
+							medStatManager.getKeyedMedAbsDivergence(compKey, ord)) * attrWeights[i];
+				} else {
+					if (!ignoreMissingStat) {
+						throw new IllegalStateException("missing stats for key " + compKey + " field " + ord);
+					}
+				}
 			}	else {
 				score  += (Math.abs( val -  medStatManager.getMedian(ord)) / medStatManager.getMedAbsDivergence(ord)) * attrWeights[i];
 			}
@@ -178,7 +188,7 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 
 	@Override
 	public boolean isValid(String compKey) {
-		// TODO Auto-generated method stub
-		return true;
+		Map<Integer, Double> allMedians = medStatManager.getAllKeyedMedian(compKey);
+		return null != allMedians;
 	}	
 }

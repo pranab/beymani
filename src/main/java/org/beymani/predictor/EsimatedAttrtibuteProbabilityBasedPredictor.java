@@ -75,7 +75,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	 */
 	public EsimatedAttrtibuteProbabilityBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
 			String attrListParam, String distrFilePathParam, String hdfsFileParam, String schemaFilePathParam,String attrWeightParam, 
-			 String seasonalParam, String fieldDelimParam, String scoreThresholdParam) throws IOException {
+			 String seasonalParam, String fieldDelimParam, String scoreThresholdParam, String ignoreMissingDistrParam) throws IOException {
 		super(config, idOrdinalsParam,  attrListParam, distrFilePathParam, hdfsFileParam, schemaFilePathParam,  seasonalParam,  
 				fieldDelimParam, scoreThresholdParam);
 			
@@ -83,6 +83,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam);
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
+		ignoreMissingDistr = ConfigUtility.getBoolean(config, ignoreMissingDistrParam);
 	}
 	
 
@@ -177,10 +178,16 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 			double val = Double.parseDouble(items[ord]);
 			System.out.println("keyWithFldOrd " + keyWithFldOrd);
 			HistogramStat hist = keyedHist.get(keyWithFldOrd);
-			double distr = hist.findDistr(val);
-			score += (1.0 - distr) * attrWeights[i];
-			totalWt += attrWeights[i];
-			++i;
+			if (null != hist) {
+				double distr = hist.findDistr(val);
+				score += (1.0 - distr) * attrWeights[i];
+				totalWt += attrWeights[i];
+				++i;
+			} else {
+				if (!ignoreMissingDistr) {
+					throw new IllegalStateException("missing distr for key " + keyWithFldOrd);
+				}
+			}
 		}
 		score /=  totalWt ;
 		
@@ -190,8 +197,9 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 
 	@Override
 	public boolean isValid(String compKey) {
-		// TODO Auto-generated method stub
-		return true;
+		String keyWithFldOrd = compKey + fieldDelim + attrOrdinals[0];
+		HistogramStat hist = keyedHist.get(keyWithFldOrd);
+		return null != hist;
 	}
 	
 }

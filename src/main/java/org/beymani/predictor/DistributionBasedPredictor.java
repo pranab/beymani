@@ -57,6 +57,7 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	protected String subFieldDelim = ";";
 	protected String fieldDelim;
 	protected boolean seasonal;
+	protected boolean ignoreMissingDistr;
 
 	/**
 	 * Storm usage
