@@ -143,7 +143,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
          
        	  case `predStrategyExtremeValueProb` => new ExtremeValuePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold",
-       	    "exp.const")
+       	    "exp.const", "ignore.missingModel")
 
        	  case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	     "stats.medFilePath", "stats.madFilePath", "field.delim.in", "attr.weights","seasonal.analysis",

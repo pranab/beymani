@@ -41,10 +41,10 @@ public class ExtremeValuePredictor extends ZscorePredictor {
 	 */
 	public ExtremeValuePredictor(Map<String, Object> config,String idOrdinalsParam, String attrListParam,
 			String fieldDelimParam, String attrWeightParam,String statsFilePathParam, String seasonalParam,
-			String hdfsFileParam, String scoreThresholdParam,String expConstParam) throws IOException {
+			String hdfsFileParam, String scoreThresholdParam,String expConstParam, String ignoreMissingStatParam) throws IOException {
 		super(config, idOrdinalsParam, attrListParam, fieldDelimParam, attrWeightParam,
 				statsFilePathParam, seasonalParam, hdfsFileParam, scoreThresholdParam,
-				expConstParam);
+				expConstParam, ignoreMissingStatParam);
 	}
 
 	/* (non-Javadoc)
