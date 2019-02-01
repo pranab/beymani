@@ -400,29 +400,35 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        lowIgnoredCounter:Accumulator[Int], highIgnoredCounter:Accumulator[Int], noIgnoredCounter:Accumulator[Int]) : String = {
 	   var newLabel = label
 	   val value = items(quantFldOrd).toDouble
-	   val hiThreshold = meanValues.get(key) + stdDevMult * stdDevValues.get(key)
-	   val loThreshold = meanValues.get(key) - stdDevMult * stdDevValues.get(key)
-	   
-	   if (label.equals("O")) {
-	     if (outlierPolarity.equals("high")) {
-	       if (value < hiThreshold) {
-	         newLabel = "N"
-	         lowIgnoredCounter += 1
-	       }
-	     } else if (outlierPolarity.equals("low")) {
-	       if (value > loThreshold) {
-	         newLabel = "N"
-	         highIgnoredCounter += 1
-	       }
-	     } else {
-	       if (value > loThreshold && value < hiThreshold) {
-	         newLabel = "N"
-	         noIgnoredCounter += 1
-	       }
-	       
-	     }
-       } 
-       newLabel
+	   val mean = meanValues.get(key)
+	   if (null != mean) {
+		   val hiThreshold = meanValues.get(key) + stdDevMult * stdDevValues.get(key)
+		   val loThreshold = meanValues.get(key) - stdDevMult * stdDevValues.get(key)
+		   
+		   if (label.equals("O")) {
+		     if (outlierPolarity.equals("high")) {
+		       if (value < hiThreshold) {
+		         newLabel = "N"
+		         lowIgnoredCounter += 1
+		       }
+		     } else if (outlierPolarity.equals("low")) {
+		       if (value > loThreshold) {
+		         newLabel = "N"
+		         highIgnoredCounter += 1
+		       }
+		     } else {
+		       if (value > loThreshold && value < hiThreshold) {
+		         newLabel = "N"
+		         noIgnoredCounter += 1
+		       }
+		       
+		     }
+	       } 
+	       newLabel
+	   } else {
+	     println("stats not found for key " + key + " record marker "  + newLabel)
+	     newLabel
+	   }
    }
    
 }
