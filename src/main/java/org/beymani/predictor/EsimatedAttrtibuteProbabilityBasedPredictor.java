@@ -173,6 +173,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		double score = 0;
 		int i = 0;
 		double totalWt = 0;
+		int validCount = 0;
 		for (int ord  :  attrOrdinals) {
 			String keyWithFldOrd = compKey + fieldDelim + ord;
 			double val = Double.parseDouble(items[ord]);
@@ -182,14 +183,17 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 				double distr = hist.findDistr(val);
 				score += (1.0 - distr) * attrWeights[i];
 				totalWt += attrWeights[i];
-				++i;
+				++validCount;
 			} else {
 				if (!ignoreMissingDistr) {
 					throw new IllegalStateException("missing distr for key " + keyWithFldOrd);
 				}
 			}
+			++i;
 		}
-		score /=  totalWt ;
+		if (validCount > 0) {
+			score /=  totalWt ;
+		} 
 		
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;

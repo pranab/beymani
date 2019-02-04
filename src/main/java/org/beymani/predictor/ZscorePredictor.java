@@ -167,6 +167,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		double score = 0;
 		int i = 0;
 		double totalWt = 0;
+		int validCount = 0;
 		System.out.println("execute compKey " + compKey);
 		for (int ord  :  attrOrdinals) {
 			double val = Double.parseDouble(items[ord]);
@@ -178,6 +179,7 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 								statsManager.getStdDev(compKey, ord)) * attrWeights[i];
 					} 
 					score += thisScore;
+					++validCount;
 				} else {
 					if (!ignoreMissingStat) {
 						throw new IllegalStateException("missing stats for key " + compKey + " field " + ord);
@@ -185,11 +187,14 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 				}
 			} else {
 				score  += (Math.abs( val - statsManager.getMean(ord)) / statsManager.getStdDev(ord)) * attrWeights[i];
+				++validCount;
 			}
 			totalWt += attrWeights[i];
 			++i;
 		}
-		score /=  totalWt ;
+		if (validCount > 0) {
+			score /=  totalWt ;
+		}
 		
 		//exponential normalization
 		score = BasicUtils.expScale(expConst, score);
