@@ -31,6 +31,7 @@ import org.chombo.util.SeasonalAnalyzer
 import org.chombo.spark.common.SeasonalUtility
 import org.beymani.predictor.EstimatedProbabilityBasedPredictor
 import org.beymani.predictor.EsimatedAttrtibuteProbabilityBasedPredictor
+import org.beymani.predictor.InterPercentileDifferenceBasedPredictor
 import org.apache.spark.Accumulator
 import org.chombo.spark.common.GeneralUtility
 
@@ -40,6 +41,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    private val predStrategyEstProb = "estimatedProbablity";
    private val predStrategyEstAttrProb = "estimatedAttributeProbablity";
    private val predStrategyExtremeValueProb = "extremeValueProbablity";
+   private val predStrategyInterPercentDiff = "interPercentileDifference";
    
    /**
    * @param args
@@ -156,6 +158,11 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	  case `predStrategyEstAttrProb` => new EsimatedAttrtibuteProbabilityBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
        	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel")
+
+       	  case `predStrategyInterPercentDiff` => new InterPercentileDifferenceBasedPredictor(algoConfig, 
+       	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
+       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel")
+	   
 	   }
 	   
 	   val ignoreMissingStat = getBooleanParamOrElse(appConfig, "ignore.missingStat", false)
@@ -343,27 +350,22 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val ignoreMissingModel = getBooleanParamOrElse(appConfig, "ignore.missingModel", true)
 	   configParams.put("ignore.missingModel", new java.lang.Boolean(ignoreMissingModel))
 	       
+	   val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
+	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
+	   configParams.put("attr.weights", attrWeights)
+
 	   predictorStrategy match {
 	     case `predStrategyZscore` => {
-	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
-	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
-	       configParams.put("attr.weights", attrWeights)
 	       val statsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.file.path", "missing stat file path")
 	       configParams.put("stats.filePath", statsFilePath)
 	     }
 	     case `predStrategyRobustZscore` => {
-	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
-	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
-	       configParams.put("attr.weights", attrWeights)
 	       val medStatsFilePath = getMandatoryStringParam(appAlgoConfig, "med.stats.file.path", "missing median stat file path")
 	       configParams.put("stats.medFilePath", medStatsFilePath)
 	       val madStatsFilePath = getMandatoryStringParam(appAlgoConfig, "mad.stats.file.path", "missing mad stat file path")
 	       configParams.put("stats.madFilePath", madStatsFilePath)
 	     }
 	     case `predStrategyExtremeValueProb` => {
-	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
-	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
-	       configParams.put("attr.weights", attrWeights)
 	       val medStatsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.medFilePath", "missing med stat file path")
 	       configParams.put("stats.medFilePath", medStatsFilePath)
 	       val madStatsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.madFilePath", "missing mad stat file path")
@@ -376,9 +378,11 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       configParams.put("schema.filePath", schemaFilePath)
 	     }
 	     case `predStrategyEstAttrProb` => {
-	       val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
-	       val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
-	       configParams.put("attr.weights", attrWeights)
+	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
+	       configParams.put("distr.filePath", distrFilePath)
+	       configParams.put("schema.filePath", null)
+	     }
+	     case `predStrategyInterPercentDiff` => {
 	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
 	       configParams.put("distr.filePath", distrFilePath)
 	       configParams.put("schema.filePath", null)
