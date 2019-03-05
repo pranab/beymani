@@ -37,8 +37,8 @@ import org.chombo.util.Utility;
 public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBasedPredictor {
 	private Map<Integer, Map<String, Integer>> attrDistr = new HashMap<Integer, Map<String, Integer>>();
 	private Map<Integer, Integer> attrDistrCounts = new HashMap<Integer, Integer>();
-	private boolean requireMissingAttrValue;
-	private String fieldDelim;
+	protected boolean requireMissingAttrValue;
+	//protected String fieldDelim;
 	
 	/**
 	 * Storm usage
