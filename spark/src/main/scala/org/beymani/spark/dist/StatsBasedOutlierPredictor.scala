@@ -350,7 +350,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val ignoreMissingModel = getBooleanParamOrElse(appConfig, "ignore.missingModel", true)
 	   configParams.put("ignore.missingModel", new java.lang.Boolean(ignoreMissingModel))
 	       
-	   val attWeightList = getMandatoryDoubleListParam(appAlgoConfig, "attr.weights", "missing attribute weights")
+	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
 	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
 	   configParams.put("attr.weights", attrWeights)
 
