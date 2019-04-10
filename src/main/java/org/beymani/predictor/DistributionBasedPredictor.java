@@ -176,6 +176,9 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 		} else {
 			fs = BasicUtils.getFileStream(filePath);
 		}
+		if (null == fs) {
+			BasicUtils.assertFail("distribution file could not be opened at path " + filePath);
+		}
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
 		seasonal = ConfigUtility.getBoolean(config, seasonalParam);
