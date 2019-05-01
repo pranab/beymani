@@ -98,7 +98,7 @@ object OutlierCounter extends JobConfiguration {
 	     val indeterPercent = (indeterCount * 100).toDouble / totalCount
 	     val normPercent = (normCount * 100).toDouble / totalCount
 	     
-	     val stBld = new StringBuilder(key.toString())
+	     val stBld = new StringBuilder(key.toString(fieldDelimOut))
 	     if (insertTimeStamp)
 	       stBld.append(fieldDelimOut).append(tmStmp)
 	     stBld.
