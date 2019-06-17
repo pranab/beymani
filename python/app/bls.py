@@ -10,27 +10,46 @@ sys.path.append(os.path.abspath("../lib"))
 from util import *
 from sampler import *
 
+def createAnomaly(soft, high):
+	if high:
+		if soft:
+			reading = randomFloat(100, 140) 
+		else:
+			reading = randomFloat(120, 200)
+	else:
+		reading = randomFloat(60, 80)
+	return reading
+	
 if __name__ == "__main__":
 	op = sys.argv[1]
 	
 	#device stats
 	if op == "stat":
+		#normal mean 80 - 100 sd 1 - 5 
+		#anomaly  mean 120 - 160 sd 1 - 5 
 		numDevs = int(sys.argv[2])
+		mmin = int(sys.argv[3])
+		mmax = int(sys.argv[4])
+		smin = int(sys.argv[5])
+		smax = int(sys.argv[6])
 		for i in range(numDevs):
-			mean = randomFloat(80, 100)
-			sd = randomFloat(1, 5)
+			mean = randomFloat(mmin, mmax)
+			sd = randomFloat(smin, smax)
 			devId = genID(12)
 			print "%s,%.3f,%.3f" %(devId, mean, sd)
 			
 	#generate reading		
 	elif op == "gen":
 		statFile = sys.argv[2]
+		numDays = int(sys.argv[3])
+		modeNorm = (sys.argv[4] == "normal")
+		
 		devices = []
 		for rec in fileRecGen(statFile, ","):
 			ds = (rec[0], float(rec[1]), float(rec[2]))
 			devices.append(ds)
 			
-		numDays = int(sys.argv[3])
+		
 		numDevs = len(devices)
 		distrs = list(map(lambda d: GaussianRejectSampler(d[1],d[2]), devices))	
 
@@ -41,37 +60,52 @@ if __name__ == "__main__":
 		sampIntv = secInDay
 		
 		anm = dict()
+		anmDesc = dict()
 		while(sampTime < curTime):
 			for i in range(numDevs):
 				d = devices[i]
 				did = d[0]
 				ts = sampTime + randint(-1000, 1000)
-				if isEventSampled(10):
-					#anomaly
-					if isEventSampled(50):
-						reading = randomFloat(120, 140)
-						high = True
-					else:
-						reading = randomFloat(60, 80)
-						high = False
-					anm[did] =  (reading, high)
-					#print "**** anomaly created %s, %d" %(did, reading)
-				else:
-					sampled = False
+				sampled = False
+				anomalyRate = 10 if (modeNorm) else 20
+				if isEventSampled(anomalyRate):
+					if not did in anm:
+						#create anomaly
+						high = isEventSampled(80)
+						reading =  createAnomaly(modeNorm, high)
+						appendKeyedList(anm, did, reading)
+						length = randint(1, 2) if(modeNorm) else randint(3, 7)
+						desc = (length, high)
+						anmDesc[did] = desc
+						sampled = True
+						#print "**** anomaly created %s, %d" %(did, reading)
+				
+				if not sampled:
 					if did in anm:
-						# moving toward normal from anomaly
-						an = anm[did]
-						if isEventSampled(60):
+						# ongoing anomaly
+						ans = anm[did]
+						desc = anmDesc[did]
+						towardsNorm = len(ans) == desc[0] 
+						an = ans[0]
+						if len(ans) == desc[0]:
+							# moving toward normal from anomaly
+							if isEventSampled(60):
+								sampled = True
+								reading = 0.85 * an if(desc[1]) else 1.15 * an
+								#print "**** moving back to normal %s, %d" %(did, reading)
+							del anm[did]
+							del anmDesc[did]
+						elif len(ans) < desc[0]:
+							# continue anomaly
+							reading = createAnomaly(modeNorm, desc[1])
+							appendKeyedList(anm, did, reading)
 							sampled = True
-							if an[1]:
-								reading = int(0.9 * an[0])
-							else:
-								reading = int(1.1 * an[0])
-							#print "**** moving back to normal %s, %d" %(did, reading)
-						del anm[did]
+							#print "**** anomaly continued %s, %d" %(did, reading)
+						
 					if not sampled:
-						#normal
+						# normal
 						reading = distrs[i].sample()
 				print "%s,%d,%d" %(did, ts, int(reading))
 			sampTime += sampIntv 
+
 				
