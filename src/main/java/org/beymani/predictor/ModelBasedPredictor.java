@@ -29,7 +29,7 @@ public abstract class ModelBasedPredictor implements Serializable {
 	protected double scoreThreshold;
 	protected boolean scoreAboveThreshold;
 	protected boolean partition = false;
-	protected double expConst;
+	protected double expConst = 1.0;
 	protected int[] idOrdinals;
 	protected int[] attrOrdinals;
 	protected double[] attrWeights;

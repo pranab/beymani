@@ -28,6 +28,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
+import org.chombo.util.BasicUtils;
 import org.chombo.util.Pair;
 
 import redis.clients.jedis.Jedis;
@@ -47,7 +48,8 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	private enum DetectionAlgorithm {
 		MissProbability, 
 		MissRate, 
-		EntropyReduction
+		EntropyReduction,
+		ConditionalProbability
 	};
 	private DetectionAlgorithm detectionAlgorithm;
 	private Map<String, Pair<Double, Double>> globalParams;
@@ -58,6 +60,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	private String outputQueue;
 	private MessageQueue outQueue;
 	private Cache cache;
+	private boolean enqueScore = true;
 	private static final Logger LOG = Logger.getLogger(MarkovModelPredictor.class);
 	private boolean debugOn;
 	
@@ -127,30 +130,12 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			 detectionAlgorithm = DetectionAlgorithm.MissRate;
 			 
 			 //max probability state index
-			 maxStateProbIndex = new int[numStates];
-			 for (int i = 0; i < numStates; ++i) {
-				 int maxProbIndex = -1;
-				 double maxProb = -1;
-				 for (int j = 0; j < numStates; ++j) {
-					 if (stateTranstionProb[i][j] > maxProb) {
-						 maxProb = stateTranstionProb[i][j];
-						 maxProbIndex = j;
-					 }
-				 }
-				 maxStateProbIndex[i] = maxProbIndex;
-			 }
+			 maxProbTargetState();
 		 } else if (algorithm.equals("entropyReduction")) {
 			 detectionAlgorithm = DetectionAlgorithm.EntropyReduction;
 			 
 			 //entropy per source state
-			 entropy = new double[numStates];
-			 for (int i = 0; i < numStates; ++i) {
-				 double ent = 0;
-				 for (int j = 0; j < numStates; ++j) {
-					 ent  += -stateTranstionProb[i][j] * Math.log(stateTranstionProb[i][j]);
-				 }
-				 entropy[i] = ent;
-			 }
+			 sourceStateEntropy();
 		 } else {
 			 //error
 		 }
@@ -159,6 +144,70 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		 metricThreshold =  Double.parseDouble(conf.get("metric.threshold").toString());
 	}
 
+	/**
+	 * @param localPredictor
+	 * @param states
+	 * @param stateTranstionProb
+	 */
+	public MarkovModelPredictor(boolean localPredictor, List<String> states, double[][] stateTranstionProb,
+			String algorithm, int stateSeqWindowSize, int stateOrdinal, double expConst) {
+		this.localPredictor = localPredictor;
+		this.states = states;
+		this.stateTranstionProb = stateTranstionProb;
+		numStates = states.size();
+		this.stateSeqWindowSize = stateSeqWindowSize;
+		this.stateOrdinal = stateOrdinal;
+		this.expConst = expConst;
+		
+		if (algorithm.equals("missProbability")) {
+			detectionAlgorithm = DetectionAlgorithm.MissProbability;
+		} else if (algorithm.equals("missRate")) {
+			detectionAlgorithm = DetectionAlgorithm.MissRate;
+			maxProbTargetState();
+		} else if (algorithm.equals("entropyReduction")) {
+			 detectionAlgorithm = DetectionAlgorithm.EntropyReduction;
+			 sourceStateEntropy();
+		} else if (algorithm.equals("conditinalProbability")) {
+			 detectionAlgorithm = DetectionAlgorithm.ConditionalProbability;
+		} else {
+			throw new IllegalArgumentException("invalid markov model prediction algorithm");
+		}
+	}
+	
+	/**
+	 * 
+	 */
+	private void maxProbTargetState() {
+		//max probability state index
+		maxStateProbIndex = new int[numStates];
+		for (int i = 0; i < numStates; ++i) {
+			int maxProbIndex = -1;
+			double maxProb = -1;
+			for (int j = 0; j < numStates; ++j) {
+				if (stateTranstionProb[i][j] > maxProb) {
+					maxProb = stateTranstionProb[i][j];
+					maxProbIndex = j;
+				}
+			}
+			maxStateProbIndex[i] = maxProbIndex;
+		}
+	}
+	
+	/**
+	 * 
+	 */
+	private void sourceStateEntropy() {
+		 //entropy per source state
+		 entropy = new double[numStates];
+		 for (int i = 0; i < numStates; ++i) {
+			 double ent = 0;
+			 for (int j = 0; j < numStates; ++j) {
+				 ent  += -stateTranstionProb[i][j] * Math.log(stateTranstionProb[i][j]);
+			 }
+			 entropy[i] = ent;
+		 }
+	}
+	
 	/**
 	 * @param table
 	 * @param data
@@ -203,7 +252,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 				for (int i = 0; i < stateSeqWindowSize; ++i) {
 					stateSeq[i] = recordSeq.get(i).split(",")[stateOrdinal];
 				}
-				score = getLocalMetric( stateSeq);
+				score = getLocalMetric(stateSeq);
 			}
 		} else {
 			//global metric
@@ -226,7 +275,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		//outlier
 		if (debugOn)
 			LOG.info("metric  " + entityID + ":" + score);
-		if (score > metricThreshold) {
+		if (enqueScore && score > metricThreshold) {
 			StringBuilder stBld = new StringBuilder(entityID);
 			stBld.append(" : ");
 			for (String st : stateSeq) {
@@ -236,6 +285,10 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			stBld.append(score);
 			outQueue.send(stBld.toString());
 		}
+		
+		//exponential normalization
+		score = BasicUtils.expScale(expConst, score);
+
 		return score;
 	}
 	
@@ -357,6 +410,21 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		}
 		params[0] = entropyWoTragetState / entropy;
 		params[1] = 1;
+	}
+	
+	/**
+	 * @param stateSeq
+	 * @param params
+	 */
+	private void conditionalProbability(String[] stateSeq, double[] params) {
+		int start = localPredictor? 1 :  stateSeq.length - 1;
+		for (int i = start; i < stateSeq.length; ++i ){
+			int prState = states.indexOf(stateSeq[i -1]);
+			int cuState = states.indexOf(stateSeq[i]);
+			double pr = stateTranstionProb[prState][cuState];
+			params[0] += -Math.log(pr);
+			params[1] += 1;
+		}		
 	}
 
 	@Override
