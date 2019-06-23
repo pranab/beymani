@@ -80,33 +80,15 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		//model
 		String modelKey =  conf.get("redis.markov.model.key").toString();
 		String model = cache.get(modelKey);
-		Scanner scanner = new Scanner(model);
-		int lineCount = 0;
-		int row = 0;
-		while (scanner.hasNextLine()) {
-		  String line = scanner.nextLine();
-		  if (0 == lineCount) {
-			  //states
-			  String[] items = line.split(",");
-			  states = Arrays.asList(items);
-			  numStates = items.length;
-			  stateTranstionProb = new double[numStates][numStates];
-			  LOG.info("numStates:" + numStates);
-		  } else {
-			  //populate state transtion probability
-		        deseralizeTableRow(stateTranstionProb, line, ",", row, numStates);
-		        ++row;
-		  }
-		  ++lineCount;
-		}
-		 scanner.close();
-		 if (debugOn){
+		buildStateTransitionProb(model);
+		
+		if (debugOn){
 			 for (int i = 0; i < numStates; ++i) {
 				 for (int j = 0; j < numStates; ++j) {
 					 LOG.info("state trans prob[" + i + "][" + j  +"]=" +  stateTranstionProb[i][j]);
 				 }
 			 }
-		 }
+		}
 		 
 		 localPredictor = Boolean.parseBoolean(conf.get("local.predictor").toString());
 		 if (localPredictor) {
@@ -209,13 +191,39 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	}
 	
 	/**
+	 * @param model
+	 */
+	private void buildStateTransitionProb(String model) {
+		Scanner scanner = new Scanner(model);
+		int lineCount = 0;
+		int row = 0;
+		while (scanner.hasNextLine()) {
+		  String line = scanner.nextLine();
+		  if (0 == lineCount) {
+			  //states
+			  String[] items = line.split(",");
+			  states = Arrays.asList(items);
+			  numStates = items.length;
+			  stateTranstionProb = new double[numStates][numStates];
+			  LOG.info("numStates:" + numStates);
+		  } else {
+			  //populate state transtion probability
+		        deseralizeTableRow(stateTranstionProb, line, ",", row, numStates);
+		        ++row;
+		  }
+		  ++lineCount;
+		}
+		scanner.close();
+	}
+	
+	/**
 	 * @param table
 	 * @param data
 	 * @param delim
 	 * @param row
 	 * @param numCol
 	 */
-	public  void deseralizeTableRow(double[][] table, String data, String delim, int row, int numCol) {
+	public  static void deseralizeTableRow(double[][] table, String data, String delim, int row, int numCol) {
 		String[] items = data.split(delim);
 		if (items.length != numCol) {
 			throw new IllegalArgumentException(
@@ -433,4 +441,50 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		return true;
 	}
 	
+	/**
+	 * @param localPredictor
+	 * @param states
+	 * @param stateTransData
+	 * @param algorithm
+	 * @param stateSeqWindowSize
+	 * @param stateOrdinal
+	 * @param expConst
+	 * @return
+	 */
+	public static Map<String, MarkovModelPredictor> createKeyedMarkovModel(boolean localPredictor, 
+			List<String> stateTransData, String algorithm, int stateSeqWindowSize, int stateOrdinal, double expConst) {
+		Map<String, MarkovModelPredictor> modelMap = new HashMap<String, MarkovModelPredictor>();
+		int numStates = 0;
+		String key = null;
+		double[][] stateTranstionProb = null;
+		int row = 0;
+		List<String> states = null;
+		for (int i = 0; i < stateTransData.size(); ++i) {
+			if (0 == i) {
+				  String[] items = stateTransData.get(i).split(",");
+				  states = Arrays.asList(items);
+				  numStates = items.length;
+			} else {
+				if ((i-1) % (numStates+1) == 0) {
+					//key
+					if (null != key) {
+						MarkovModelPredictor model = new MarkovModelPredictor(localPredictor,  states, stateTranstionProb,
+								algorithm, stateSeqWindowSize, stateOrdinal, expConst);
+						modelMap.put(key, model);
+					}
+					key = stateTransData.get(i);
+					stateTranstionProb = new double[numStates][numStates];
+					row = 0;
+				} else {
+					//state transition
+					String line = stateTransData.get(i);
+					deseralizeTableRow(stateTranstionProb, line, ",", row, numStates);	
+					++row;
+				}
+			}
+		}
+		return modelMap;
+	}
+	
 }
+
