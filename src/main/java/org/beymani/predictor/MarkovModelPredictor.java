@@ -234,6 +234,19 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		}
 	}
 	
+	/**
+	 * @param table
+	 * @param tabData
+	 * @param offset
+	 * @param row
+	 * @param numCol
+	 */
+	public  static void deseralizeTableRow(double[][] table, String[] tabData, int offset, int row, int numCol) {
+		for (int c = 0; c < numCol; ++c) {
+			table[row][c]  = Double.parseDouble(tabData[offset + c]);
+		}	
+	}
+	
 	@Override
 	public double execute(String entityID, String record) {
 		double score = 0;
@@ -452,33 +465,44 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	 * @return
 	 */
 	public static Map<String, MarkovModelPredictor> createKeyedMarkovModel(boolean localPredictor, 
-			List<String> stateTransData, String algorithm, int stateSeqWindowSize, int stateOrdinal, double expConst) {
+			List<String> stateTransData, boolean compact, String delim, List<String> states, String algorithm, 
+			int stateSeqWindowSize, int stateOrdinal, double expConst) {
 		Map<String, MarkovModelPredictor> modelMap = new HashMap<String, MarkovModelPredictor>();
-		int numStates = 0;
-		String key = null;
-		double[][] stateTranstionProb = null;
-		int row = 0;
-		List<String> states = null;
-		for (int i = 0; i < stateTransData.size(); ++i) {
-			if (0 == i) {
-				  String[] items = stateTransData.get(i).split(",");
-				  states = Arrays.asList(items);
-				  numStates = items.length;
-			} else {
-				if ((i-1) % (numStates+1) == 0) {
-					//key
-					if (null != key) {
+		int numStates = states.size();
+		if (compact) {
+			//compact, one state transition table per line
+			for (int i = 0; i < stateTransData.size(); ++i) {
+				String[] items = stateTransData.get(i).split(delim);
+				double[][] stateTranstionProb = new double[numStates][numStates];  
+				int offset = items.length - numStates * numStates;
+				String key = BasicUtils.join(items, 0, offset, delim);
+				for (int j = 0; j < numStates; ++j) {
+					deseralizeTableRow(stateTranstionProb, items, offset, j, numStates);
+					offset += numStates;
+				}
+				MarkovModelPredictor model = new MarkovModelPredictor(localPredictor,  states, stateTranstionProb,
+						algorithm, stateSeqWindowSize, stateOrdinal, expConst);
+				modelMap.put(key, model);
+			}
+		} else {
+			//long format, one one state transition table row per line
+			String key = null;
+			double[][] stateTranstionProb = null;
+			int row = 0;
+			for (int i = 0; i < stateTransData.size(); ++i) {
+				if (i % (numStates + 1) == 0) {
+					if (i > 0) {
 						MarkovModelPredictor model = new MarkovModelPredictor(localPredictor,  states, stateTranstionProb,
 								algorithm, stateSeqWindowSize, stateOrdinal, expConst);
 						modelMap.put(key, model);
 					}
 					key = stateTransData.get(i);
-					stateTranstionProb = new double[numStates][numStates];
+					stateTranstionProb = new double[numStates][numStates];  
 					row = 0;
 				} else {
 					//state transition
 					String line = stateTransData.get(i);
-					deseralizeTableRow(stateTranstionProb, line, ",", row, numStates);	
+					deseralizeTableRow(stateTranstionProb, line, delim, row, numStates);	
 					++row;
 				}
 			}
