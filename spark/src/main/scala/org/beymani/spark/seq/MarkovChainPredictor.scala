@@ -27,6 +27,8 @@ import com.typesafe.config.Config
 import org.beymani.spark.common.OutlierUtility
 import org.chombo.spark.common.GeneralUtility
 import org.chombo.spark.common.SeasonalUtility
+import org.beymani.predictor.MarkovModelPredictor
+
 
 object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with GeneralUtility with SeasonalUtility {
   
@@ -49,17 +51,75 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val keyFields = toOptionalIntArray(getOptionalIntListParam(appConfig, "id.fieldOrdinals"))
 	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
-	   val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
-	   val attrOrdsList = attrOrds.toList
+	   val attrOrd = getMandatoryIntParam(appConfig, "attr.ordinal")
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
 	   val outputOutliers = getBooleanParamOrElse(appConfig, "output.outliers", false)
 	   val remOutliers = getBooleanParamOrElse(appConfig, "rem.outliers", false)
 	   val cleanDataDirPath = getConditionalMandatoryStringParam(remOutliers, appConfig, "clean.dataDirPath", 
 	       "missing clean data file output directory")
 	   val seasonalTypeFldOrd = getOptionalIntParam(appConfig, "seasonal.typeFldOrd")
+	   val seasonalTypeInData = seasonalTypeFldOrd match {
+		     case Some(seasonalOrd:Int) => true
+		     case None => false
+	   }
 	   val windowSize = getIntParamOrElse(appConfig, "window.size", 3)
 	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
-	   val analyzerMap = creatSeasonalAnalyzerMap(this, appConfig, seasonalAnalysis)
+	   val analyzerMap = creatSeasonalAnalyzerMap(this, appConfig, seasonalAnalysis, seasonalTypeInData)
+	   val analyzers = creatSeasonalAnalyzerArray(this, appConfig, seasonalAnalysis, seasonalTypeInData)
+	   val states = getMandatoryStringListParam(appConfig, "states.list", "")
+	   val stateTransFilePath = getMandatoryStringParam(appConfig, "stateTrans.filePath", "missing state transition file path")
+	   val stateTransCompact = getBooleanParamOrElse(appConfig, "stateTrans.compact", true)
+	   val fileLines = BasicUtils.getFileLines(stateTransFilePath)
+	   val expConst :java.lang.Double = getDoubleParamOrElse(appConfig, "exp.const", 1.0)
+	   val globalModel = getBooleanParamOrElse(appConfig, "model.global", false)
+	   val ignoreMissingModel = getBooleanParamOrElse(appConfig, "ignore.missingModel", false)
+	   val debugOn = appConfig.getBoolean("debug.on")
+	   val saveOutput = appConfig.getBoolean("save.output")
+	   
+	   val markovPredictors = MarkovModelPredictor.createKeyedMarkovModel(true, fileLines, stateTransCompact, fieldDelimIn, states, 
+	       predictorStrategy, windowSize, attrOrd, expConst)
+	   val keyLen = getKeyLength(keyFields, seasonalAnalysis) 
+
+	   //input
+	   val data = sparkCntxt.textFile(inputPath)
+	   if (remOutliers)
+		   data.cache
+	   	   
+	   val taggedData = data.map(line => {
+		 val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
+		 val key = Record(keyLen)
+		 addPrimarykeys(items, keyFields,  key)
+		 addSeasonalKeys(this, appConfig,analyzerMap, analyzers, items, seasonalAnalysis, key)
+	     val value = Record(2)
+	     value.addLong(items(seqFieldOrd).toLong)
+	     value.addString(line)
+	   	 (key, value)
+	   }).groupByKey.flatMap(r => {
+	     val key = r._1
+	     val keyStr = key.getString()
+	     val mKey = getModelKey(key, seasonalAnalysis, globalModel).toString
+	     val predictor = markovPredictors.get(mKey)
+	     val values = r._2.toList.sortBy(v => v.getLong(0))
+	     values.map(r => {
+	       val rec = r.getString(1)
+	       var score = -1.0
+	       var tag = "I"
+	       if (null != predictor) {
+	    	   score = predictor.execute(keyStr, rec)
+	    	   tag = if (score < scoreThreshold) "O" else "N"
+	       }
+	       rec + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + tag  
+	     })
+	   })
+	   
+	 if (debugOn) {
+         val records = taggedData.collect
+         records.slice(0, 100).foreach(r => println(r))
+     }
+	   
+	 if(saveOutput) {	   
+	     taggedData.saveAsTextFile(outputPath) 
+	 }	 
 	   
    }
 }
