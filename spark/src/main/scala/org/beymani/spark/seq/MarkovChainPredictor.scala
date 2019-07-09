@@ -99,8 +99,8 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	     val keyStr = key.getString()
 	     val mKey = getModelKey(key, seasonalAnalysis, globalModel).toString
 	     val predictor = markovPredictors.get(mKey)
-	     val values = r._2.toList.sortBy(v => v.getLong(0))
-	     values.map(r => {
+	     val values = r._2.toArray.sortBy(v => v.getLong(0))
+	     val scoreTags = values.map(r => {
 	       val rec = r.getString(1)
 	       var score = -1.0
 	       var tag = "I"
@@ -108,7 +108,27 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	    	   score = predictor.execute(keyStr, rec)
 	    	   tag = if (score < scoreThreshold) "O" else "N"
 	       }
-	       rec + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + tag  
+	       val scoreTag = Record(2)
+	       scoreTag.add(score, tag)
+	       scoreTag
+	     })
+	     
+	     //spread outlier tag over window
+	     for (i <- 0 to scoreTags.length -1) {
+	       val scoreTag = scoreTags(i)
+	       if (scoreTag.getString(1).equals("O")) {
+	         for (j <- i - windowSize + 1 to i - 1) {
+	           scoreTags(j) = Record(scoreTag)
+	         }
+	       }
+	     }
+	     
+	     //add tag and score
+	     scoreTags.zip(values).map(r => {
+	       val score = r._1.getDouble(0)
+	       val tag = r._1.getString(1)
+	       val rec = r._2.getString(1)
+	       rec + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + tag 
 	     })
 	   })
 	   
