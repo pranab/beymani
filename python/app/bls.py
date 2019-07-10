@@ -10,12 +10,9 @@ sys.path.append(os.path.abspath("../lib"))
 from util import *
 from sampler import *
 
-def createAnomaly(soft, high):
+def createAnomaly(high):
 	if high:
-		if soft:
-			reading = randomFloat(100, 140) 
-		else:
-			reading = randomFloat(120, 200)
+		reading = randomFloat(120, 200)
 	else:
 		reading = randomFloat(60, 80)
 	return reading
@@ -72,7 +69,7 @@ if __name__ == "__main__":
 					if not did in anm:
 						#create anomaly
 						high = isEventSampled(80)
-						reading =  createAnomaly(modeNorm, high)
+						reading =  createAnomaly(high)
 						appendKeyedList(anm, did, reading)
 						length = randint(1, 2) if(modeNorm) else randint(3, 7)
 						desc = (length, high)
@@ -97,7 +94,7 @@ if __name__ == "__main__":
 							del anmDesc[did]
 						elif len(ans) < desc[0]:
 							# continue anomaly
-							reading = createAnomaly(modeNorm, desc[1])
+							reading = createAnomaly(desc[1])
 							appendKeyedList(anm, did, reading)
 							sampled = True
 							#print "**** anomaly continued %s, %d" %(did, reading)

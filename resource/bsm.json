@@ -1,0 +1,25 @@
+{
+		"attributes" :
+		[
+			{
+				"name" : "devID",
+				"ordinal" : 0,
+				"dataType" : "string",
+				"targetFieldOrdinals" : [0]
+			},
+			{
+				"name" : "timeStamp",
+				"ordinal" : 1,
+				"dataType" : "long",
+				"targetFieldOrdinals" : [1]
+			},
+			{
+				"name" : "measurement",
+				"ordinal" : 2,
+				"dataType" : "int",
+				"buckeWidth" : 5.0,
+				"transformers" : ["discretizerTrans"],
+				"targetFieldOrdinals" : [2]
+			}
+		]
+}
