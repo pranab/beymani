@@ -66,7 +66,7 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
 	   val analyzerMap = creatSeasonalAnalyzerMap(this, appConfig, seasonalAnalysis, seasonalTypeInData)
 	   val analyzers = creatSeasonalAnalyzerArray(this, appConfig, seasonalAnalysis, seasonalTypeInData)
-	   val states = getMandatoryStringListParam(appConfig, "states.list", "")
+	   val states = getMandatoryStringListParam(appConfig, "state.list", "")
 	   val stateTransFilePath = getMandatoryStringParam(appConfig, "stateTrans.filePath", "missing state transition file path")
 	   val stateTransCompact = getBooleanParamOrElse(appConfig, "stateTrans.compact", true)
 	   val fileLines = BasicUtils.getFileLines(stateTransFilePath)
@@ -118,7 +118,7 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	       val scoreTag = scoreTags(i)
 	       if (scoreTag.getString(1).equals("O")) {
 	         for (j <- i - windowSize + 1 to i - 1) {
-	           scoreTags(j) = Record(scoreTag)
+	           scoreTags(j).addString(1, scoreTag.getString(1))
 	         }
 	       }
 	     }

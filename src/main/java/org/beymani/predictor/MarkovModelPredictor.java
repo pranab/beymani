@@ -491,14 +491,13 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 			int row = 0;
 			for (int i = 0; i < stateTransData.size(); ++i) {
 				if (i % (numStates + 1) == 0) {
-					if (i > 0) {
-						MarkovModelPredictor model = new MarkovModelPredictor(localPredictor,  states, stateTranstionProb,
-								algorithm, stateSeqWindowSize, stateOrdinal, expConst);
-						modelMap.put(key, model);
-					}
+					//new key
 					key = stateTransData.get(i);
 					stateTranstionProb = new double[numStates][numStates];  
 					row = 0;
+					MarkovModelPredictor model = new MarkovModelPredictor(localPredictor,  states, stateTranstionProb,
+							algorithm, stateSeqWindowSize, stateOrdinal, expConst);
+					modelMap.put(key, model);
 				} else {
 					//state transition
 					String line = stateTransData.get(i);

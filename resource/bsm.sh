@@ -29,6 +29,16 @@ case "$1" in
 	--conf spark.ui.killEnabled=true --master $MASTER $AVENIR_JAR_NAME  $INPUT $OUTPUT bsm.conf
 ;;
 
+"olPredict")
+	echo "running MarkovChainPredictor"
+	CLASS_NAME=org.beymani.spark.seq.MarkovChainPredictor
+	INPUT=file:///Users/pranab/Projects/bin/beymani/input/bsm/pred/*
+	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/bsm/pred
+	rm -rf ./output/bsm/pred
+	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
+	--conf spark.ui.killEnabled=true --master $MASTER $JAR_NAME  $INPUT $OUTPUT bsm.conf
+;;
+
 *) 
 	echo "unknown operation $1"
 	;;
