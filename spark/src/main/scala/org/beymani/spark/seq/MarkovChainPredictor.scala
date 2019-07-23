@@ -54,9 +54,6 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	   val attrOrd = getMandatoryIntParam(appConfig, "attr.ordinal")
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
 	   val outputOutliers = getBooleanParamOrElse(appConfig, "output.outliers", false)
-	   val remOutliers = getBooleanParamOrElse(appConfig, "rem.outliers", false)
-	   val cleanDataDirPath = getConditionalMandatoryStringParam(remOutliers, appConfig, "clean.dataDirPath", 
-	       "missing clean data file output directory")
 	   val seasonalTypeFldOrd = getOptionalIntParam(appConfig, "seasonal.typeFldOrd")
 	   val seasonalTypeInData = seasonalTypeFldOrd match {
 		     case Some(seasonalOrd:Int) => true
@@ -78,12 +75,13 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	   
 	   val markovPredictors = MarkovModelPredictor.createKeyedMarkovModel(true, fileLines, stateTransCompact, fieldDelimIn, states, 
 	       predictorStrategy, windowSize, attrOrd, expConst)
+	   for (key  <- markovPredictors.keySet().asScala) {
+	     markovPredictors.get(key).withEnqueScore(false).withDebugOn(debugOn)
+	   }
 	   val keyLen = getKeyLength(keyFields, seasonalAnalysis) 
 
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
-	   if (remOutliers)
-		   data.cache
 	   	   
 	   val taggedData = data.map(line => {
 		 val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
@@ -96,7 +94,7 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	   	 (key, value)
 	   }).groupByKey.flatMap(r => {
 	     val key = r._1
-	     val keyStr = key.getString()
+	     val keyStr = key.toString()
 	     val mKey = getModelKey(key, seasonalAnalysis, globalModel).toString
 	     val predictor = markovPredictors.get(mKey)
 	     val values = r._2.toArray.sortBy(v => v.getLong(0))
@@ -106,7 +104,7 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	       var tag = "I"
 	       if (null != predictor) {
 	    	   score = predictor.execute(keyStr, rec)
-	    	   tag = if (score < scoreThreshold) "O" else "N"
+	    	   tag = if (score > scoreThreshold) "O" else "N"
 	       }
 	       val scoreTag = Record(2)
 	       scoreTag.add(score, tag)

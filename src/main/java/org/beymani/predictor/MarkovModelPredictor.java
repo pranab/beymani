@@ -157,6 +157,24 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	}
 	
 	/**
+	 * @param enqueScore
+	 * @return
+	 */
+	public MarkovModelPredictor withEnqueScore(boolean enqueScore) {
+		this.enqueScore = enqueScore;
+		return this;
+	}
+	
+	/**
+	 * @param debugOn
+	 * @return
+	 */
+	public MarkovModelPredictor withDebugOn(boolean debugOn) {
+		this.debugOn = debugOn;
+		return this;
+	}
+	
+	/**
 	 * 
 	 */
 	private void maxProbTargetState() {
@@ -250,7 +268,8 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	@Override
 	public double execute(String entityID, String record) {
 		double score = 0;
-		
+		if (debugOn)
+			System.out.println("anomaly score for key " + entityID + " record " + record);
 		List<String> recordSeq = records.get(entityID);
 		if (null == recordSeq) {
 			recordSeq = new ArrayList<String>();
@@ -267,7 +286,7 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		if (localPredictor) {
 			//local metric
 			if (debugOn)
-				LOG.info("local metric,  seq size " + recordSeq.size());
+				System.out.println("local metric,  seq size " + recordSeq.size());
 			if (recordSeq.size() == stateSeqWindowSize) {
 				stateSeq = new String[stateSeqWindowSize]; 
 				for (int i = 0; i < stateSeqWindowSize; ++i) {
@@ -308,8 +327,9 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		}
 		
 		//exponential normalization
-		score = BasicUtils.expScale(expConst, score);
-
+		if (expConst > 0) {
+			score = BasicUtils.expScale(expConst, score);
+		}
 		return score;
 	}
 	
@@ -330,13 +350,24 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 		double[] params = new double[2];
 		params[0] = params[1] = 0;
 		if (detectionAlgorithm == DetectionAlgorithm.MissProbability) {
+			System.out.println("executing MissProbability");
 			missProbability(stateSeq, params);
 		} else if (detectionAlgorithm == DetectionAlgorithm.MissRate) {
+			System.out.println("executing MissRate");
 			 missRate(stateSeq, params);
+		} else if (detectionAlgorithm == DetectionAlgorithm.EntropyReduction) {
+			System.out.println("executing EntropyReduction");
+			 entropyReduction(stateSeq, params);
+		} else if (detectionAlgorithm == DetectionAlgorithm.ConditionalProbability) {
+			System.out.println("executing ConditionalProbability");
+			conditionalProbability(stateSeq, params);
 		} else {
-			 entropyReduction( stateSeq, params);
+			BasicUtils.assertFail("invalid anomaly detection algorithm");
 		}
+		
 		metric = params[0] / params[1];	
+		if (debugOn)
+			System.out.println("raw outlier score " + BasicUtils.formatDouble(metric, 6));
 		return metric;
 	}	
 	
@@ -439,13 +470,15 @@ public class MarkovModelPredictor extends ModelBasedPredictor {
 	 */
 	private void conditionalProbability(String[] stateSeq, double[] params) {
 		int start = localPredictor? 1 :  stateSeq.length - 1;
+		params[0] = 0.0;
 		for (int i = start; i < stateSeq.length; ++i ){
 			int prState = states.indexOf(stateSeq[i -1]);
 			int cuState = states.indexOf(stateSeq[i]);
-			double pr = stateTranstionProb[prState][cuState];
-			params[0] += -Math.log(pr);
+			double pr = -Math.log(stateTranstionProb[prState][cuState]);
+			params[0] += pr;
 			params[1] += 1;
-		}		
+		}	
+		System.out.println("conditional prob " + BasicUtils.formatDouble(params[0], 6));
 	}
 
 	@Override
