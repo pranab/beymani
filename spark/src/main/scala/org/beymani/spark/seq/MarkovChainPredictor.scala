@@ -70,16 +70,21 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	   val expConst :java.lang.Double = getDoubleParamOrElse(appConfig, "exp.const", 1.0)
 	   val globalModel = getBooleanParamOrElse(appConfig, "model.global", false)
 	   val ignoreMissingModel = getBooleanParamOrElse(appConfig, "ignore.missingModel", false)
+	   val keyedThresholdFilePath = getOptionalStringParam(appConfig, "path.thresholdByKey")
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 	   
+	   //per key predictors
 	   val markovPredictors = MarkovModelPredictor.createKeyedMarkovModel(true, fileLines, stateTransCompact, fieldDelimIn, states, 
 	       predictorStrategy, windowSize, attrOrd, expConst)
 	   for (key  <- markovPredictors.keySet().asScala) {
 	     markovPredictors.get(key).withEnqueScore(false).withDebugOn(debugOn)
 	   }
+	   
+	   //per key threshold values
 	   val keyLen = getKeyLength(keyFields, seasonalAnalysis) 
-
+	   val keyedThresholdValues = getperKeyThreshold(keyedThresholdFilePath, keyLen, keyLen)
+	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
 	   	   
@@ -97,6 +102,7 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	     val keyStr = key.toString()
 	     val mKey = getModelKey(key, seasonalAnalysis, globalModel).toString
 	     val predictor = markovPredictors.get(mKey)
+	     val threshold = getThreshold(key, keyedThresholdValues, scoreThreshold)
 	     val values = r._2.toArray.sortBy(v => v.getLong(0))
 	     val scoreTags = values.map(r => {
 	       val rec = r.getString(1)
@@ -104,7 +110,7 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	       var tag = "I"
 	       if (null != predictor) {
 	    	   score = predictor.execute(keyStr, rec)
-	    	   tag = if (score > scoreThreshold) "O" else "N"
+	    	   tag = if (score > threshold) "O" else "N"
 	       }
 	       val scoreTag = Record(2)
 	       scoreTag.add(score, tag)

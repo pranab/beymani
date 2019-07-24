@@ -17,6 +17,10 @@
 
 package org.beymani.spark.common
 import org.apache.spark.rdd.RDD
+import scala.collection.JavaConverters._
+//import scala.collection.immutable.Map
+import org.chombo.util.BasicUtils
+import org.chombo.spark.common.Record
 
 /**
  * @author pranab
@@ -72,5 +76,36 @@ trait OutlierUtility {
 	 }
 	 
 	 tData
+	}
+	
+	/**
+	 * @param keyedThresholdFilePath
+	 * @param keyLen
+	 * @param thresholdOrd
+	 * @return
+	 */
+	def getperKeyThreshold(keyedThresholdFilePath:Option[String], keyLen:Int, thresholdOrd:Int) : 
+	  Option[Map[Record,Double]] = {
+	  keyedThresholdFilePath match {
+	    case Some(path:String) => {
+	      val thValues = BasicUtils.getKeyedValues(path, keyLen, thresholdOrd).asScala
+	      val newData = thValues.map(e => Record(e._1) -> e._2.toDouble).toMap
+	      Some(newData)
+	    }
+	    case None => None
+	  }
+	}
+	
+	/**
+	 * @param key
+	 * @param thValues
+	 * @param glThreshold
+	 * @return
+	 */
+	def getThreshold(key:Record, thValues:Option[Map[Record,Double]], glThreshold:Double) : Double =  {
+	  thValues match {
+	    case Some(thValMap) => thValMap.getOrElse(key, glThreshold)
+	    case None => glThreshold
+	  }
 	}
 }
