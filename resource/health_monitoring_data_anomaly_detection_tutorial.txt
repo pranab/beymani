@@ -1,0 +1,76 @@
+This tutorial is for anaomaly detection in health monitoring data. Sequence anomaly is detected 
+with markov chain model. 
+ 
+Environment
+===========
+Path etc shown here corresposnds to my environment. Please Change them  as needed  for your 
+environment. The script bsm.sh is for running spark jobs and various other tasks. The configuration 
+is in bsm.conf
+
+Build
+=====
+Follow instructions in spark_dependency.txt
+
+Python dependency
+=================
+The shell script commands for data generation run python scripts for data generation. Before you run 
+the data generation commands do the following
+1. checkout project avenir
+2. copy the avenir/python/lib directory to ../lib with respect to your location of cpu_usage.py file
+
+Create device reading mean and std dev
+======================================
+./bls.py stat <num_dev> > dstat.txt
+
+num_dev = number of devices e.g 200
+
+Create training data
+====================
+./bls.py gen dstat.txt <nun_days> normal > <train_data_file>
+where
+nun_days = num of days for which data should be generated (e.g 300)
+train_data_file = training data file
+
+Copy <train_data_file>  to the spark input directory.
+cp <train_data_file> ./input/bsm/train
+
+Copy meta data file
+====================
+cp bsm.json ./meta
+
+Discretize training data
+========================
+Run dicretization spark job
+./bsm.sh transformTrain
+
+Discretization step is set to 5 in bsm.conf
+
+Build model
+===========
+Run Spark job
+./bsm.sh stateTrans
+
+Consolidate model files
+=======================
+Copy all Spark generated files into one
+./bsm.sh cpModel
+
+Create test data
+================
+Create test data with outliers
+./bls.py gen dstat.txt <nun_days> anomaly > <test_data_file>
+nun_days = num of days for which data should be generated (e.g 30)
+test_data_file = test data file name
+
+Copy file
+cp  <test_data_file> ./input/bsm/pred
+
+Discretize test data
+====================
+Run dicretization spark job
+./bsm.sh transformPred
+
+Anomaly prediction Spark job
+============================
+./bsm.sh olPredict
+
