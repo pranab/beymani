@@ -157,7 +157,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	
        	  case `predStrategyEstAttrProb` => new EsimatedAttrtibuteProbabilityBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
-       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel")
+       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", "score.strategy")
 
        	  case `predStrategyInterPercentDiff` => new InterPercentileDifferenceBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
@@ -381,6 +381,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
 	       configParams.put("distr.filePath", distrFilePath)
 	       configParams.put("schema.filePath", null)
+	       val olScoreStrategy = getStringParamOrElse(appAlgoConfig, "score.strategy", "inverse")
+	       configParams.put("score.strategy", olScoreStrategy)
 	     }
 	     case `predStrategyInterPercentDiff` => {
 	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")

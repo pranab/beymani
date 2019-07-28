@@ -38,7 +38,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	private Map<Integer, Map<String, Integer>> attrDistr = new HashMap<Integer, Map<String, Integer>>();
 	private Map<Integer, Integer> attrDistrCounts = new HashMap<Integer, Integer>();
 	protected boolean requireMissingAttrValue;
-	//protected String fieldDelim;
+	protected String scoreStrategy;
 	
 	/**
 	 * Storm usage
@@ -75,7 +75,8 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	 */
 	public EsimatedAttrtibuteProbabilityBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
 			String attrListParam, String distrFilePathParam, String hdfsFileParam, String schemaFilePathParam,String attrWeightParam, 
-			 String seasonalParam, String fieldDelimParam, String scoreThresholdParam, String ignoreMissingDistrParam) throws IOException {
+			 String seasonalParam, String fieldDelimParam, String scoreThresholdParam, String ignoreMissingDistrParam,
+			 String scoreStrategyParam) throws IOException {
 		super(config, idOrdinalsParam,  attrListParam, distrFilePathParam, hdfsFileParam, schemaFilePathParam,  seasonalParam,  
 				fieldDelimParam, scoreThresholdParam);
 			
@@ -84,6 +85,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 		ignoreMissingDistr = ConfigUtility.getBoolean(config, ignoreMissingDistrParam);
+		scoreStrategy = ConfigUtility.getString(config, scoreStrategyParam);
 	}
 	
 
@@ -181,7 +183,13 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 			HistogramStat hist = keyedHist.get(keyWithFldOrd);
 			if (null != hist) {
 				double distr = hist.findDistr(val);
-				score += (1.0 - distr) * attrWeights[i];
+				double invDistr = 0;
+				if (scoreStrategy.equals("inverse")) {
+					invDistr = 1.0 - distr;
+				} else {
+					invDistr = -Math.log(distr);
+				}
+				score += invDistr * attrWeights[i];
 				totalWt += attrWeights[i];
 				++validCount;
 			} else {
