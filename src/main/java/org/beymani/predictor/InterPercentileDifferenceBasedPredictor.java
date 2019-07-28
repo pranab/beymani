@@ -58,7 +58,7 @@ public class InterPercentileDifferenceBasedPredictor extends EsimatedAttrtibuteP
 			String seasonalParam, String fieldDelimParam,String scoreThresholdParam, String ignoreMissingDistrParam)
 			throws IOException {
 		super(config, idOrdinalsParam, attrListParam, distrFilePathParam,hdfsFileParam, schemaFilePathParam, attrWeightParam,
-				seasonalParam, fieldDelimParam, scoreThresholdParam,ignoreMissingDistrParam);
+				seasonalParam, fieldDelimParam, scoreThresholdParam,ignoreMissingDistrParam, "score.strategy");
 	}
 
 	/**

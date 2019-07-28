@@ -183,13 +183,13 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 			HistogramStat hist = keyedHist.get(keyWithFldOrd);
 			if (null != hist) {
 				double distr = hist.findDistr(val);
-				double invDistr = 0;
+				double thisScore = 0;
 				if (scoreStrategy.equals("inverse")) {
-					invDistr = 1.0 - distr;
+					thisScore = 1.0 - distr;
 				} else {
-					invDistr = -Math.log(distr);
+					thisScore = -Math.log(distr);
 				}
-				score += invDistr * attrWeights[i];
+				score += thisScore * attrWeights[i];
 				totalWt += attrWeights[i];
 				++validCount;
 			} else {
