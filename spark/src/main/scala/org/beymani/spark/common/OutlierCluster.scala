@@ -15,7 +15,6 @@
  * permissions and limitations under the License.
  */
 
-
 package org.beymani.spark.common
 
 import scala.Array.canBuildFrom
@@ -58,6 +57,7 @@ object OutlierCluster extends JobConfiguration  with GeneralUtility  {
 	   val maxInterval = getConditionalMandatoryIntParam(clusterStrategy.equals("maxInterval") || clusterStrategy.equals("both"), 
 	       appConfig, "cluster.maxInterval", "missing average interval")
 	   val minClusterMemeber = getIntParamOrElse(appConfig, "cluster.minSzie", 3)
+	   val clProtoStrategy = getStringParamOrElse(appConfig, "cluster.protoStrategy", "center")
 	   val debugOn = getBooleanParamOrElse(appConfig, "debug.on", false)
 	   val saveOutput = getBooleanParamOrElse(appConfig,"save.output", true)
 	   
@@ -75,16 +75,22 @@ object OutlierCluster extends JobConfiguration  with GeneralUtility  {
 	     
 	     //outlier time stamps
 	     val fiValues = values.filter(r => r(r.length-1).equals("O"))
-	     val timeStamps = fiValues.map(v => java.lang.Long.parseLong(v(seqFieldOrd)))
+	     val timeStampScores = fiValues.map(v => 
+	       (java.lang.Long.parseLong(v(seqFieldOrd)), java.lang.Double.parseDouble(v(v.length-2))) )
 	     val sequences = new java.util.ArrayList[java.lang.Long]()
-	     for (t <- timeStamps) {
-	       sequences.add(t)
+	     val scores = new java.util.ArrayList[java.lang.Double]()
+	     for (t <- timeStampScores) {
+	       sequences.add(t._1)
+	       scores.add(t._2)
 	     }
 	     
 	     //temporal cluster
 	     val clusFinder = new SequenceClusterFinder(sequences, avInterval, maxInterval,  clusterStrategy)
 	     clusFinder.findClusters()
-	     val prototypes =  BasicUtils.flatten(clusFinder.getPrototypes(minClusterMemeber)).asScala.toSet
+	     val prototypeList = 
+	       if (clProtoStrategy.equals("center")) clusFinder.getPrototypes(minClusterMemeber)
+	       else clusFinder.getPrototypes(minClusterMemeber, clProtoStrategy, scores)
+	     val prototypes =  BasicUtils.flatten(prototypeList).asScala.toSet
 	     
 	     //append another field for cluster based tag
 	     values.map(v => {
