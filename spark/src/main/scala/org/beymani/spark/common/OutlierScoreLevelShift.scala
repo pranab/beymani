@@ -18,28 +18,27 @@
 package org.beymani.spark.common
 
 import scala.Array.canBuildFrom
-import scala.collection.JavaConverters.asScalaBufferConverter
-
+import scala.collection.JavaConverters._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
 import org.chombo.spark.common.GeneralUtility
 import org.chombo.spark.common.JobConfiguration
 import org.chombo.spark.common.Record
 import org.chombo.util.BasicUtils
-import org.hoidla.window.SequenceClusterFinder
+import org.hoidla.window.SizeBoundFloatStatsWindow
 
 /**
- * Reduces outlier flooding  with temporal clustering
+ * Outlier detection based on level shift outlier score from any algorithm
  * @author pranab
  */
-object OutlierCluster extends JobConfiguration  with GeneralUtility  {
+object OutlierScoreLevelShift extends JobConfiguration  with GeneralUtility  {
   
    /**
    * @param args
    * @return
    */
    def main(args: Array[String]) {
-	   val appName = "outlierCluster"
+	   val appName = "outlierScoreLevelShift"
 	   val Array(inputPath: String, outputPath: String, configFile: String) = getCommandLineArgs(args, 3)
 	   val config = createConfig(configFile)
 	   val sparkConf = createSparkConf(appName, config, false)
@@ -51,14 +50,9 @@ object OutlierCluster extends JobConfiguration  with GeneralUtility  {
 	   val fieldDelimOut = getStringParamOrElse(appConfig, "field.delim.out", ",")
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
 	   val keyLen = getMandatoryIntParam(appConfig, "key.length", "missing key length")
-	   val clusterStrategy = getStringParamOrElse(appConfig, "cluster.strategy", "averageInterval")
-	   val avInterval = getConditionalMandatoryIntParam(clusterStrategy.equals("averageInterval") || clusterStrategy.equals("both"), 
-	       appConfig, "cluster.avInterval", "missing average interval")
-	   val maxInterval = getConditionalMandatoryIntParam(clusterStrategy.equals("maxInterval") || clusterStrategy.equals("both"), 
-	       appConfig, "cluster.maxInterval", "missing average interval")
-	   val minClusterMemeber = getIntParamOrElse(appConfig, "cluster.minSzie", 3)
-	   val clProtoStrategy = getStringParamOrElse(appConfig, "cluster.protoStrategy", "center")
-	   val ignoreSmallCluster = getBooleanParamOrElse(appConfig, "cluster.ignoreSmall", false)
+	   val longWindowSize = getMandatoryIntParam(appConfig, "window.longSize", "missing long window size")
+	   val shortWindowSize = getMandatoryIntParam(appConfig, "window.shortSize", "missing short window size")
+	   val minZscore = getMandatoryDoubleParam(appConfig, "zscore.min", "missing min z score")
 	   val debugOn = getBooleanParamOrElse(appConfig, "debug.on", false)
 	   val saveOutput = getBooleanParamOrElse(appConfig,"save.output", true)
 	   
@@ -70,52 +64,58 @@ object OutlierCluster extends JobConfiguration  with GeneralUtility  {
 		 val key = Record(items, 0, keyLen)
 		 (key, items)
 	   }).groupByKey.flatMap(r => {
+	     val longWindow = new SizeBoundFloatStatsWindow(longWindowSize)
+	     val shortWindow = new SizeBoundFloatStatsWindow(shortWindowSize)
 	     val values = r._2.toArray.sortBy(v => {
 	       v(seqFieldOrd).toLong
 	     })
+	     val newTags = values.map(v => {
+	       val score = v(v.size - 2).toDouble
+	       val tag = v(v.size - 1)
+	       longWindow.add(score)
+	       shortWindow.add(score)
+	       var newTag = ""
+	       if (longWindow.isFull()) {
+	         val loMean = longWindow.getMean()
+	         val loStdDev = longWindow.getStdDev()
+	         val shMean = shortWindow.getMean()
+	         val levelBasedScore = (shMean - loMean) / loStdDev;
+	         newTag = if (levelBasedScore > minZscore) "O" else "N"
+	       } else {
+	         newTag = tag
+	       }
+	       val rec = Record(2)
+	       rec.add(tag,newTag)
+	     })
 	     
-	     //outlier time stamps
-	     val fiValues = values.filter(r => r(r.length-1).equals("O"))
-	     val timeStampScores = fiValues.map(v => 
-	       (java.lang.Long.parseLong(v(seqFieldOrd)), java.lang.Double.parseDouble(v(v.length-2))) )
-	     val sequences = new java.util.ArrayList[java.lang.Long]()
-	     val scores = new java.util.ArrayList[java.lang.Double]()
-	     for (t <- timeStampScores) {
-	       sequences.add(t._1)
-	       scores.add(t._2)
+	     //propagate outlier tag
+	     for (i <- longWindowSize to newTags.length -1) {
+	       if(newTags(i).getString(1) == "O") {
+	         for (j <- i - shortWindowSize + 1 to i - 1) {
+	           val tag = if (newTags(j).getString(0) == "I") "I" else "O"
+	           val rec = Record(2)
+	           rec.add(newTags(j).getString(0), tag)
+	           newTags(j)  = rec
+	         }
+	       }
 	     }
 	     
-	     //temporal cluster
-	     val clusFinder = new SequenceClusterFinder(sequences, avInterval, maxInterval,  clusterStrategy)
-	     clusFinder.findClusters()
-	     val prototypeList = 
-	       if (clProtoStrategy.equals("center")) clusFinder.getPrototypes(minClusterMemeber, ignoreSmallCluster)
-	       else clusFinder.getPrototypes(minClusterMemeber, clProtoStrategy, scores, ignoreSmallCluster)
-	     val prototypes =  BasicUtils.flatten(prototypeList).asScala.toSet
-	     
-	     //append another field for cluster based tag
-	     values.map(v => {
-	       val ts = java.lang.Long.parseLong(v(seqFieldOrd))
-	       var tag = ""
-	       val curTag = v(v.length-1)
-	       if (curTag.equals("I")) {
-	         tag = "I"
-	       } else {
-	    	 tag = if (prototypes.contains(ts)) "O" else "N"
-	       }
-	       v.mkString(fieldDelimOut) + fieldDelimOut + tag
+	     val recValues = values.map(v => Record(v))
+	     newTags.zip(recValues).map(r => {
+	       val newTag  = r._1.getString(1)
+	       val rec = r._2.getString(0)
+	       rec + fieldDelimOut + newTag
 	     })
-	   })
-
-	   if (debugOn) {
+	 })
+	   
+	 if (debugOn) {
          val records = taggedData.collect
          records.slice(0, 100).foreach(r => println(r))
-       }
+     }
 	   
-	   if(saveOutput) {	   
+	 if(saveOutput) {	   
 	     taggedData.saveAsTextFile(outputPath) 
-	   }	 
+	 }	 
 	   
    }
-
 }
