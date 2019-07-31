@@ -58,6 +58,7 @@ object OutlierCluster extends JobConfiguration  with GeneralUtility  {
 	       appConfig, "cluster.maxInterval", "missing average interval")
 	   val minClusterMemeber = getIntParamOrElse(appConfig, "cluster.minSzie", 3)
 	   val clProtoStrategy = getStringParamOrElse(appConfig, "cluster.protoStrategy", "center")
+	   val ignoreSmallCluster = getBooleanParamOrElse(appConfig, "cluster.ignoreSmall", false)
 	   val debugOn = getBooleanParamOrElse(appConfig, "debug.on", false)
 	   val saveOutput = getBooleanParamOrElse(appConfig,"save.output", true)
 	   
@@ -88,8 +89,8 @@ object OutlierCluster extends JobConfiguration  with GeneralUtility  {
 	     val clusFinder = new SequenceClusterFinder(sequences, avInterval, maxInterval,  clusterStrategy)
 	     clusFinder.findClusters()
 	     val prototypeList = 
-	       if (clProtoStrategy.equals("center")) clusFinder.getPrototypes(minClusterMemeber)
-	       else clusFinder.getPrototypes(minClusterMemeber, clProtoStrategy, scores)
+	       if (clProtoStrategy.equals("center")) clusFinder.getPrototypes(minClusterMemeber, ignoreSmallCluster)
+	       else clusFinder.getPrototypes(minClusterMemeber, clProtoStrategy, scores, ignoreSmallCluster)
 	     val prototypes =  BasicUtils.flatten(prototypeList).asScala.toSet
 	     
 	     //append another field for cluster based tag
