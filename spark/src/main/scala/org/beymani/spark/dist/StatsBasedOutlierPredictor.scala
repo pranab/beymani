@@ -34,6 +34,7 @@ import org.beymani.predictor.EsimatedAttrtibuteProbabilityBasedPredictor
 import org.beymani.predictor.InterPercentileDifferenceBasedPredictor
 import org.apache.spark.Accumulator
 import org.chombo.spark.common.GeneralUtility
+import org.beymani.predictor.EstimatedMetaProbabilityBasedPredictor
 
 object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility with GeneralUtility{
    private val predStrategyZscore = "zscore";
@@ -42,6 +43,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    private val predStrategyEstAttrProb = "estimatedAttributeProbablity";
    private val predStrategyExtremeValueProb = "extremeValueProbablity";
    private val predStrategyInterPercentDiff = "interPercentileDifference";
+   private val predStrategyEstMetaProb = "estimatedMetaProbablity";
    
    /**
    * @param args
@@ -163,6 +165,9 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
        	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel")
 	   
+       	  case `predStrategyEstMetaProb` => new EstimatedMetaProbabilityBasedPredictor(algoConfig, 
+       	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
+       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", "score.strategy")
 	   }
 	   
 	   val ignoreMissingStat = getBooleanParamOrElse(appConfig, "ignore.missingStat", false)
@@ -388,6 +393,13 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
 	       configParams.put("distr.filePath", distrFilePath)
 	       configParams.put("schema.filePath", null)
+	     }
+	     case `predStrategyEstMetaProb` => {
+	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
+	       configParams.put("distr.filePath", distrFilePath)
+	       configParams.put("schema.filePath", null)
+	       val olScoreStrategy = getStringParamOrElse(appAlgoConfig, "score.strategy", "inverse")
+	       configParams.put("score.strategy", olScoreStrategy)
 	     }
 	   }
 	   

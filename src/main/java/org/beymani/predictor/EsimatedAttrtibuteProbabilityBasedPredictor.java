@@ -187,7 +187,11 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 				if (scoreStrategy.equals("inverse")) {
 					thisScore = 1.0 - distr;
 				} else {
-					thisScore = -Math.log(distr);
+					if (distr > 0) {
+						thisScore = -Math.log(distr);
+					} else {
+						thisScore = 20.0;
+					}
 				}
 				score += thisScore * attrWeights[i];
 				totalWt += attrWeights[i];
