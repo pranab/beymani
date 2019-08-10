@@ -76,7 +76,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	public EsimatedAttrtibuteProbabilityBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
 			String attrListParam, String distrFilePathParam, String hdfsFileParam, String schemaFilePathParam,String attrWeightParam, 
 			 String seasonalParam, String fieldDelimParam, String scoreThresholdParam, String ignoreMissingDistrParam,
-			 String scoreStrategyParam) throws IOException {
+			 String scoreStrategyParam, String expConstParam) throws IOException {
 		super(config, idOrdinalsParam,  attrListParam, distrFilePathParam, hdfsFileParam, schemaFilePathParam,  seasonalParam,  
 				fieldDelimParam, scoreThresholdParam);
 			
@@ -86,6 +86,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 		ignoreMissingDistr = ConfigUtility.getBoolean(config, ignoreMissingDistrParam);
 		scoreStrategy = ConfigUtility.getString(config, scoreStrategyParam);
+		expConst = ConfigUtility.getDouble(config, expConstParam);
 	}
 	
 
@@ -197,15 +198,18 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 				totalWt += attrWeights[i];
 				++validCount;
 			} else {
-				if (!ignoreMissingDistr) {
-					throw new IllegalStateException("missing distr for key " + keyWithFldOrd);
-				}
+				BasicUtils.assertCondition(!ignoreMissingDistr, "missing distr for key " + keyWithFldOrd);
 			}
 			++i;
 		}
 		if (validCount > 0) {
 			score /=  totalWt ;
 		} 
+		
+		//exponential normalization
+		if (expConst > 0) {
+			score = BasicUtils.expScale(expConst, score);
+		}
 		
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;

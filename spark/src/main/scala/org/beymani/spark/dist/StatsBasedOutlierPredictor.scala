@@ -35,6 +35,8 @@ import org.beymani.predictor.InterPercentileDifferenceBasedPredictor
 import org.apache.spark.Accumulator
 import org.chombo.spark.common.GeneralUtility
 import org.beymani.predictor.EstimatedMetaProbabilityBasedPredictor
+import org.beymani.predictor.EstimatedCumProbabilityBasedPredictor
+
 
 object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility with GeneralUtility{
    private val predStrategyZscore = "zscore";
@@ -44,6 +46,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    private val predStrategyExtremeValueProb = "extremeValueProbablity";
    private val predStrategyInterPercentDiff = "interPercentileDifference";
    private val predStrategyEstMetaProb = "estimatedMetaProbablity";
+   private val predStrategyEstCumProb = "estimatedCumProbablity";
    
    /**
    * @param args
@@ -159,7 +162,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	
        	  case `predStrategyEstAttrProb` => new EsimatedAttrtibuteProbabilityBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
-       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", "score.strategy")
+       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", 
+       	    "score.strategy", "exp.const")
 
        	  case `predStrategyInterPercentDiff` => new InterPercentileDifferenceBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
@@ -167,7 +171,12 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   
        	  case `predStrategyEstMetaProb` => new EstimatedMetaProbabilityBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
-       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", "score.strategy")
+       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", 
+       	    "score.strategy", "exp.const")
+       	  
+       	  case `predStrategyEstCumProb` => new EstimatedCumProbabilityBasedPredictor(algoConfig, 
+       	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
+       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel")
 	   }
 	   
 	   val ignoreMissingStat = getBooleanParamOrElse(appConfig, "ignore.missingStat", false)
@@ -400,6 +409,11 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       configParams.put("schema.filePath", null)
 	       val olScoreStrategy = getStringParamOrElse(appAlgoConfig, "score.strategy", "inverse")
 	       configParams.put("score.strategy", olScoreStrategy)
+	     }
+	     case `predStrategyEstCumProb` => {
+	       val distrFilePath = getMandatoryStringParam(appAlgoConfig, "distr.file.path", "missing distr file path")
+	       configParams.put("distr.filePath", distrFilePath)
+	       configParams.put("schema.filePath", null)
 	     }
 	   }
 	   

@@ -24,14 +24,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.chombo.stats.HistogramStat;
 import org.chombo.util.BasicUtils;
 
-/**
- * Based on probability of probability p(f(y) < f(x)). f(x) is density function
- * @author pranab
- *
- */
-public class EstimatedMetaProbabilityBasedPredictor extends EsimatedAttrtibuteProbabilityBasedPredictor {
+public class EstimatedCumProbabilityBasedPredictor extends EsimatedAttrtibuteProbabilityBasedPredictor {
 
-	public EstimatedMetaProbabilityBasedPredictor(Map conf) {
+	public EstimatedCumProbabilityBasedPredictor(Map conf) {
 		super(conf);
 	}
 
@@ -49,13 +44,12 @@ public class EstimatedMetaProbabilityBasedPredictor extends EsimatedAttrtibutePr
 	 * @param ignoreMissingDistrParam
 	 * @throws IOException
 	 */
-	public EstimatedMetaProbabilityBasedPredictor(Map<String, Object> config,String idOrdinalsParam, String attrListParam,
+	public EstimatedCumProbabilityBasedPredictor(Map<String, Object> config,String idOrdinalsParam, String attrListParam,
 			String distrFilePathParam, String hdfsFileParam,String schemaFilePathParam, String attrWeightParam,
-			String seasonalParam, String fieldDelimParam,String scoreThresholdParam, String ignoreMissingDistrParam, 
-			String scoreStrategyParam, String expConstParam)
+			String seasonalParam, String fieldDelimParam,String scoreThresholdParam, String ignoreMissingDistrParam)
 			throws IOException {
 		super(config, idOrdinalsParam, attrListParam, distrFilePathParam,hdfsFileParam, schemaFilePathParam, attrWeightParam,
-				seasonalParam, fieldDelimParam, scoreThresholdParam,ignoreMissingDistrParam, scoreStrategyParam, expConstParam);
+				seasonalParam, fieldDelimParam, scoreThresholdParam,ignoreMissingDistrParam, "score.strategy", "exp.const");
 	}
 
 	/**
@@ -66,12 +60,12 @@ public class EstimatedMetaProbabilityBasedPredictor extends EsimatedAttrtibutePr
 	 * @param fieldDelimParam
 	 * @throws IOException
 	 */
-	public EstimatedMetaProbabilityBasedPredictor(Configuration config,String distrFilePathParam, String attrWeightParam,
+	public EstimatedCumProbabilityBasedPredictor(Configuration config,String distrFilePathParam, String attrWeightParam,
 			String scoreThresholdParam, String fieldDelimParam)
 			throws IOException {
 		super(config, distrFilePathParam, attrWeightParam, scoreThresholdParam,fieldDelimParam);
 	}
-	
+
 	@Override
 	public double execute(String[] items, String compKey) {
 		double score = 0;
@@ -84,17 +78,8 @@ public class EstimatedMetaProbabilityBasedPredictor extends EsimatedAttrtibutePr
 			System.out.println("keyWithFldOrd " + keyWithFldOrd);
 			HistogramStat hist = keyedHist.get(keyWithFldOrd);
 			if (null != hist) {
-				double distr = hist.findMetaDistr(val);
-				double thisScore = 0;
-				if (scoreStrategy.equals("inverse")) {
-					thisScore = 1.0 - distr;
-				} else {
-					if (distr > 0) {
-						thisScore = -Math.log(distr);
-					} else {
-						thisScore = 20.0;
-					}
-				}
+				double distr = hist.findCumDistr(val);
+				double thisScore = distr < 0.5 ? 1.0 - distr : distr;
 				score += thisScore * attrWeights[i];
 				totalWt += attrWeights[i];
 				++validCount;
@@ -106,11 +91,6 @@ public class EstimatedMetaProbabilityBasedPredictor extends EsimatedAttrtibutePr
 		if (validCount > 0) {
 			score /=  totalWt ;
 		} 
-		
-		//exponential normalization
-		if (expConst > 0) {
-			score = BasicUtils.expScale(expConst, score);
-		}
 		
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;
