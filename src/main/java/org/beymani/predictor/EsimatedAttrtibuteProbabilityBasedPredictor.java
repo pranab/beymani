@@ -76,13 +76,12 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	public EsimatedAttrtibuteProbabilityBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
 			String attrListParam, String distrFilePathParam, String hdfsFileParam, String schemaFilePathParam,String attrWeightParam, 
 			 String seasonalParam, String fieldDelimParam, String scoreThresholdParam, String ignoreMissingDistrParam,
-			 String scoreStrategyParam, String expConstParam) throws IOException {
+			 String scoreStrategyParam, String expConstParam, String scoreAggggregationStrtaegyParam) throws IOException {
 		super(config, idOrdinalsParam,  attrListParam, distrFilePathParam, hdfsFileParam, schemaFilePathParam,  seasonalParam,  
-				fieldDelimParam, scoreThresholdParam);
+				fieldDelimParam, scoreThresholdParam, attrWeightParam,scoreAggggregationStrtaegyParam);
 			
 		//attribute weights
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam);
-		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 		ignoreMissingDistr = ConfigUtility.getBoolean(config, ignoreMissingDistrParam);
 		scoreStrategy = ConfigUtility.getString(config, scoreStrategyParam);

@@ -18,6 +18,11 @@
 package org.beymani.predictor;
 
 import java.io.Serializable;
+import java.util.Map;
+
+import org.beymani.util.OutlierScoreAggregator;
+import org.chombo.util.BasicUtils;
+import org.chombo.util.ConfigUtility;
 
 /**
  * Base class for all model based predictors
@@ -34,7 +39,22 @@ public abstract class ModelBasedPredictor implements Serializable {
 	protected int[] attrOrdinals;
 	protected double[] attrWeights;
 	protected boolean ignoreMissingStat;
+	private String aggregationStrategy;
 
+	public ModelBasedPredictor() {
+		
+	}
+	
+	/**
+	 * @param config
+	 * @param attrWeightParam
+	 * @param scoreAggggregationStrtaegyParam
+	 */
+	public ModelBasedPredictor(Map<String, Object> config, String attrWeightParam, String scoreAggggregationStrtaegyParam) {
+		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
+		aggregationStrategy = ConfigUtility.getString(config, scoreAggggregationStrtaegyParam);;
+	}
+	
 	/**
 	 * @param entityID
 	 * @param record
@@ -79,6 +99,23 @@ public abstract class ModelBasedPredictor implements Serializable {
 	 * @param compKey
 	 * @return
 	 */
-	public abstract boolean isValid(String compKey);
+	public  abstract boolean isValid(String compKey);
+	
+	/**
+	 * @return
+	 */
+	public double getAggregateScore(OutlierScoreAggregator scoreAggregator) {
+		double aggrScore = 0;
+		if (aggregationStrategy.equals("average")) {
+			aggrScore = scoreAggregator.getAverage();
+		} else if (aggregationStrategy.equals("weightedAverage")) {
+			aggrScore = scoreAggregator.getWeightedAverage();
+		} else if (aggregationStrategy.equals("median")) {
+			aggrScore = scoreAggregator.getMedian();
+		} else {
+			BasicUtils.assertFail("invalid outlier score aggregation strategy " + aggregationStrategy);
+		}
+		return aggrScore;
+	}
 	
 }

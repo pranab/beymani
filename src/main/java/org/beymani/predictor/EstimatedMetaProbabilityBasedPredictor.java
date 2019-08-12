@@ -52,10 +52,11 @@ public class EstimatedMetaProbabilityBasedPredictor extends EsimatedAttrtibutePr
 	public EstimatedMetaProbabilityBasedPredictor(Map<String, Object> config,String idOrdinalsParam, String attrListParam,
 			String distrFilePathParam, String hdfsFileParam,String schemaFilePathParam, String attrWeightParam,
 			String seasonalParam, String fieldDelimParam,String scoreThresholdParam, String ignoreMissingDistrParam, 
-			String scoreStrategyParam, String expConstParam)
+			String scoreStrategyParam, String expConstParam, String scoreAggggregationStrtaegyParam)
 			throws IOException {
 		super(config, idOrdinalsParam, attrListParam, distrFilePathParam,hdfsFileParam, schemaFilePathParam, attrWeightParam,
-				seasonalParam, fieldDelimParam, scoreThresholdParam,ignoreMissingDistrParam, scoreStrategyParam, expConstParam);
+				seasonalParam, fieldDelimParam, scoreThresholdParam,ignoreMissingDistrParam, scoreStrategyParam, expConstParam,
+				scoreAggggregationStrtaegyParam);
 	}
 
 	/**

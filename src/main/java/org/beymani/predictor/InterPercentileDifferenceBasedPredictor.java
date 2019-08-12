@@ -55,10 +55,12 @@ public class InterPercentileDifferenceBasedPredictor extends EsimatedAttrtibuteP
 	 */
 	public InterPercentileDifferenceBasedPredictor(Map<String, Object> config,String idOrdinalsParam, String attrListParam,
 			String distrFilePathParam, String hdfsFileParam,String schemaFilePathParam, String attrWeightParam,
-			String seasonalParam, String fieldDelimParam,String scoreThresholdParam, String ignoreMissingDistrParam)
+			String seasonalParam, String fieldDelimParam,String scoreThresholdParam, String ignoreMissingDistrParam,
+			String expConstParam, String scoreAggggregationStrtaegyParam)
 			throws IOException {
 		super(config, idOrdinalsParam, attrListParam, distrFilePathParam,hdfsFileParam, schemaFilePathParam, attrWeightParam,
-				seasonalParam, fieldDelimParam, scoreThresholdParam,ignoreMissingDistrParam, "score.strategy");
+				seasonalParam, fieldDelimParam, scoreThresholdParam,ignoreMissingDistrParam, "score.strategy", expConstParam,
+				scoreAggggregationStrtaegyParam);
 	}
 
 	/**

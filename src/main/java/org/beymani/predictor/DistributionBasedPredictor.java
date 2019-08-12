@@ -123,34 +123,6 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
     	scoreThreshold =  Double.parseDouble(config.get("dbp.score.threshold"));
 	}
 	
-	/**
-	 * @param config
-	 * @param idOrdinalsParam
-	 * @param distrFilePathParam
-	 * @param hdfsFileParam
-	 * @param schemaFilePathParam
-	 * @param seasonalParam
-	 * @param fieldDelimParam
-	 * @param scoreThresholdParam
-	 * @param pseudoMultiVariate
-	 * @throws IOException
-	 */
-	/*
-	public DistributionBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
-			String distrFilePathParam, String hdfsFileParam,
-			String schemaFilePathParam, String seasonalParam, String fieldDelimParam, 
-			String scoreThresholdParam, boolean pseudoMultiVariate) throws IOException {
-		super();
-		if (pseudoMultiVariate) {
-			initializePseudoMultiVariate(config, idOrdinalsParam, distrFilePathParam, hdfsFileParam,
-					schemaFilePathParam, seasonalParam, fieldDelimParam, scoreThresholdParam);
-		} else {
-			initializeMultiVariate(config, idOrdinalsParam, distrFilePathParam, hdfsFileParam,
-					schemaFilePathParam, seasonalParam, fieldDelimParam, scoreThresholdParam);
-		}
-		
-	}
-	 */
 	
 	/**
 	 * uni variate distribution
@@ -167,7 +139,9 @@ public abstract class DistributionBasedPredictor extends ModelBasedPredictor {
 	public DistributionBasedPredictor(Map<String, Object> config, String idOrdinalsParam, 
 			String attrListParam, String distrFilePathParam, String hdfsFileParam,
 			String schemaFilePathParam, String seasonalParam, String fieldDelimParam, 
-			String scoreThresholdParam) throws IOException {
+			String scoreThresholdParam, String attrWeightParam, String scoreAggggregationStrtaegyParam) throws IOException {
+		super(config, attrWeightParam, scoreAggggregationStrtaegyParam);
+		
 		boolean hdfsFilePath = ConfigUtility.getBoolean(config, hdfsFileParam);
 		String filePath = ConfigUtility.getString(config, distrFilePathParam);
 		InputStream fs = null;

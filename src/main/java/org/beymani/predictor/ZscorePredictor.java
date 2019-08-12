@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.beymani.util.OutlierScoreAggregator;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
 import org.chombo.util.BasicUtils;
@@ -81,8 +82,9 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	 */
 	public ZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, String fieldDelimParam, 
 			String attrWeightParam, String statsFilePathParam, String seasonalParam,String hdfsFileParam, 
-			String scoreThresholdParam, String expConstParam, String ignoreMissingStatParam) 
+			String scoreThresholdParam, String expConstParam, String ignoreMissingStatParam, String scoreAggggregationStrtaegyParam) 
 		throws IOException {
+		super(config,  attrWeightParam,  scoreAggggregationStrtaegyParam);
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
@@ -96,7 +98,6 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 		} else {
 			statsManager = new NumericalAttrStatsManager(statsFilePath, ",",  hdfsFilePath);
 		}
-		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 		realTimeDetection = true;
 		expConst = ConfigUtility.getDouble(config, expConstParam);
@@ -142,9 +143,9 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 				if (seasonal) {
 					
 				}
-				score  += (Math.abs( val -  statsManager.getMean(compKey,ord)) / statsManager.getStdDev(compKey, ord)) * attrWeights[i];
+				score  += (Math.abs(val -  statsManager.getMean(compKey,ord)) / statsManager.getStdDev(compKey, ord)) * attrWeights[i];
 			} else {
-				score  += (Math.abs( val -  statsManager.getMean(ord)) / statsManager.getStdDev(ord)) * attrWeights[i];
+				score  += (Math.abs(val -  statsManager.getMean(ord)) / statsManager.getStdDev(ord)) * attrWeights[i];
 			}
 			totalWt += attrWeights[i];
 			++i;
@@ -166,38 +167,38 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	public double execute(String[] items, String compKey) {
 		double score = 0;
 		int i = 0;
-		double totalWt = 0;
-		int validCount = 0;
 		System.out.println("execute compKey " + compKey);
+		OutlierScoreAggregator scoreAggregator = new OutlierScoreAggregator(attrWeights.length, attrWeights);
+		double thisScore = 0;
 		for (int ord  :  attrOrdinals) {
 			double val = Double.parseDouble(items[ord]);
 			if (null != idOrdinals) {
 				if (statsManager.statsExists(compKey, ord)) {
-					double thisScore = 0;
+					thisScore = 0;
 					if (statsManager.getStdDev(compKey, ord) > 0) {
 						thisScore = (Math.abs( val - statsManager.getMean(compKey,ord)) / 
-								statsManager.getStdDev(compKey, ord)) * attrWeights[i];
-					} 
-					score += thisScore;
-					++validCount;
-				} else {
-					if (!ignoreMissingStat) {
-						throw new IllegalStateException("missing stats for key " + compKey + " field " + ord);
+								statsManager.getStdDev(compKey, ord));
+						scoreAggregator.addScore(thisScore);
+					} else {
+						scoreAggregator.addScore();
 					}
+				} else {
+					BasicUtils.assertCondition(!ignoreMissingStat, "missing stats for key " + compKey + " field " + ord);
+					scoreAggregator.addScore();
 				}
 			} else {
-				score  += (Math.abs( val - statsManager.getMean(ord)) / statsManager.getStdDev(ord)) * attrWeights[i];
-				++validCount;
+				thisScore = (Math.abs( val - statsManager.getMean(ord)) / statsManager.getStdDev(ord));
+				scoreAggregator.addScore(thisScore);
 			}
-			totalWt += attrWeights[i];
 			++i;
 		}
-		if (validCount > 0) {
-			score /=  totalWt ;
-		}
+		//aggregate score	
+		score = getAggregateScore(scoreAggregator);
 		
 		//exponential normalization
-		score = BasicUtils.expScale(expConst, score);
+		if (expConst > 0) {
+			score = BasicUtils.expScale(expConst, score);
+		}
 
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;

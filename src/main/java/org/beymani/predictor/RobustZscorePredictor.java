@@ -36,7 +36,7 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	private int[] attrOrdinals;
     private MedianStatsManager medStatManager;
 	private String fieldDelim;
-	private double[] attrWeights;
+	//private double[] attrWeights;
 	protected MessageQueue outQueue;
 	protected Cache cache;
 	private boolean seasonal;
@@ -88,7 +88,9 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	 */
 	public RobustZscorePredictor(Map<String, Object> config, String idOrdinalsParam, String attrListParam, 
 			String medFilePathParam, String madFilePathParam,  String fieldDelimParam, String attrWeightParam, 
-			String seasonalParam, String hdfsFileParam, String expConstParam, String scoreThresholdParam, String ignoreMissingStatParam) throws IOException {
+			String seasonalParam, String hdfsFileParam, String expConstParam, String scoreThresholdParam, 
+			String ignoreMissingStatParam, String scoreAggggregationStrtaegyParam) throws IOException {
+		super(config,  attrWeightParam,  scoreAggggregationStrtaegyParam);
 		idOrdinals = ConfigUtility.getIntArray(config, idOrdinalsParam);
 		attrOrdinals = ConfigUtility.getIntArray(config, attrListParam);
 		fieldDelim = ConfigUtility.getString(config, fieldDelimParam, ",");
@@ -98,7 +100,6 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 		seasonal = ConfigUtility.getBoolean(config, seasonalParam);
 		medStatManager = new MedianStatsManager(config, medFilePath, madFilePath, fieldDelim,  idOrdinals, hdfsFilePath,  seasonal);
 		
-		attrWeights = ConfigUtility.getDoubleArray(config, attrWeightParam);
 		expConst = ConfigUtility.getDouble(config, expConstParam);
 		scoreThreshold = ConfigUtility.getDouble(config, scoreThresholdParam);
 		ignoreMissingStat = ConfigUtility.getBoolean(config, ignoreMissingStatParam);

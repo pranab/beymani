@@ -146,15 +146,15 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val predictor = predictorStrategy match {
        	  case `predStrategyZscore` => new ZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold",
-       	    "exp.const", "ignore.missingModel")
+       	    "exp.const", "ignore.missingModel", "attr.weightStrategy")
          
        	  case `predStrategyExtremeValueProb` => new ExtremeValuePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	    "field.delim.in", "attr.weights", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold",
-       	    "exp.const", "ignore.missingModel")
+       	    "exp.const", "ignore.missingModel", "attr.weightStrategy")
 
        	  case `predStrategyRobustZscore` => new RobustZscorePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
        	     "stats.medFilePath", "stats.madFilePath", "field.delim.in", "attr.weights","seasonal.analysis",
-       	     "hdfs.file", "exp.const","score.threshold", "ignore.missingModel");
+       	     "hdfs.file", "exp.const","score.threshold", "ignore.missingModel", "attr.weightStrategy");
      
        	  case `predStrategyEstProb` => new EstimatedProbabilityBasedPredictor(algoConfig, "id.fieldOrdinals", 
        	     "distr.file.path", "hdfs.file", "schema.file.path", "seasonal.analysis", "field.delim.in", 
@@ -163,20 +163,22 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	  case `predStrategyEstAttrProb` => new EsimatedAttrtibuteProbabilityBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
        	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", 
-       	    "score.strategy", "exp.const")
+       	    "score.strategy", "exp.const", "attr.weightStrategy")
 
        	  case `predStrategyInterPercentDiff` => new InterPercentileDifferenceBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
-       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel")
+       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", 
+       	    "exp.const", "attr.weightStrategy")
 	   
        	  case `predStrategyEstMetaProb` => new EstimatedMetaProbabilityBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
        	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", 
-       	    "score.strategy", "exp.const")
+       	    "score.strategy", "exp.const", "attr.weightStrategy")
        	  
        	  case `predStrategyEstCumProb` => new EstimatedCumProbabilityBasedPredictor(algoConfig, 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
-       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel")
+       	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", 
+       	    "attr.weightStrategy")
 	   }
 	   
 	   val ignoreMissingStat = getBooleanParamOrElse(appConfig, "ignore.missingStat", false)
@@ -368,6 +370,9 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
 	   configParams.put("attr.weights", attrWeights)
 
+	   val aggregationStrategy = getStringParamOrElse(appConfig, "attr.weightStrategy", "weightedAverage")
+	   configParams.put("attr.weightStrategy", aggregationStrategy)
+	   
 	   predictorStrategy match {
 	     case `predStrategyZscore` => {
 	       val statsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.file.path", "missing stat file path")
