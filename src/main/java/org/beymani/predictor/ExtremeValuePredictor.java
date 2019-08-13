@@ -20,6 +20,9 @@ package org.beymani.predictor;
 import java.io.IOException;
 import java.util.Map;
 
+import org.beymani.util.OutlierScoreAggregator;
+import org.chombo.util.BasicUtils;
+
 /**
  * @author pranab
  *
@@ -54,24 +57,35 @@ public class ExtremeValuePredictor extends ZscorePredictor {
 	@Override
 	public double execute(String[] items, String compKey) {
 		double score = 0;
-		int i = 0;
-		double totalWt = 0;
+		OutlierScoreAggregator scoreAggregator = new OutlierScoreAggregator(attrWeights.length, attrWeights);
+		double thisScore = 0;
 		for (int ord  :  attrOrdinals) {
 			double val = Double.parseDouble(items[ord]);
 			double d = 0;
 			double e = 0;
 			if (null != idOrdinals) {
-				d = Math.abs( val - statsManager.getMean(compKey,ord));
-				e = Math.exp(-d / statsManager.getStdDev(compKey, ord));
+				if (statsManager.statsExists(compKey, ord)) {
+					d = Math.abs( val - statsManager.getMean(compKey,ord));
+					e = Math.exp(-d / statsManager.getStdDev(compKey, ord));
+					thisScore  = Math.exp(-e);
+					scoreAggregator.addScore(thisScore);
+				} else {
+					scoreAggregator.addScore();
+				}
 			} else {
 				d = Math.abs( val - statsManager.getMean(ord));
 				e = Math.exp(-d / statsManager.getStdDev(ord));
+				thisScore  = Math.exp(-e);
+				scoreAggregator.addScore(thisScore);
 			}
-			score  += Math.exp(-e) * attrWeights[i];
-			totalWt += attrWeights[i];
-			++i;
 		}
-		score /=  totalWt ;
+		//aggregate score	
+		score = getAggregateScore(scoreAggregator);
+		
+		//exponential normalization
+		if (expConst > 0) {
+			score = BasicUtils.expScale(expConst, score);
+		}
 		
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;

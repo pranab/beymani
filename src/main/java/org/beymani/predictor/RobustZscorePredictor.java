@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.beymani.util.OutlierScoreAggregator;
 import org.chombo.storm.Cache;
 import org.chombo.storm.MessageQueue;
 import org.chombo.util.BasicUtils;
@@ -159,28 +160,32 @@ public class RobustZscorePredictor extends ModelBasedPredictor {
 	@Override
 	public double execute(String[] items, String compKey) {
 		double score = 0;
-		int i = 0;
-		double totalWt = 0;
+		double thisScore = 0;
+		OutlierScoreAggregator scoreAggregator = new OutlierScoreAggregator(attrWeights.length, attrWeights);
 		for (int ord  :  attrOrdinals) {
 			double val = Double.parseDouble(items[ord]);
 			if (null != idOrdinals) {
 				Map<Integer, Double> allMedians = medStatManager.getAllKeyedMedian(compKey);
 				if (null != allMedians) {
-					score  += (Math.abs( val - medStatManager.getKeyedMedian(compKey, ord) ) / 
-							medStatManager.getKeyedMedAbsDivergence(compKey, ord)) * attrWeights[i];
+					thisScore = (Math.abs( val - medStatManager.getKeyedMedian(compKey, ord) ) / 
+							medStatManager.getKeyedMedAbsDivergence(compKey, ord));
+					scoreAggregator.addScore(thisScore);
 				} else {
-					if (!ignoreMissingStat) {
-						throw new IllegalStateException("missing stats for key " + compKey + " field " + ord);
-					}
+					BasicUtils.assertCondition(!ignoreMissingStat, "missing stats for key " + compKey + " field " + ord);
+					scoreAggregator.addScore();
 				}
 			}	else {
-				score  += (Math.abs( val -  medStatManager.getMedian(ord)) / medStatManager.getMedAbsDivergence(ord)) * attrWeights[i];
+				thisScore  = (Math.abs( val -  medStatManager.getMedian(ord)) / medStatManager.getMedAbsDivergence(ord));
+				scoreAggregator.addScore(thisScore);
 			}
 		}
-		score /=  totalWt ;
+		//aggregate score	
+		score = getAggregateScore(scoreAggregator);
 		
 		//exponential normalization
-		score = BasicUtils.expScale(expConst, score);
+		if (expConst > 0) {
+			score = BasicUtils.expScale(expConst, score);
+		}
 
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;

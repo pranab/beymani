@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.beymani.util.OutlierScoreAggregator;
 import org.chombo.stats.HistogramStat;
 import org.chombo.util.BasicUtils;
 
@@ -71,9 +72,8 @@ public class EstimatedCumProbabilityBasedPredictor extends EsimatedAttrtibutePro
 	@Override
 	public double execute(String[] items, String compKey) {
 		double score = 0;
-		int i = 0;
-		double totalWt = 0;
-		int validCount = 0;
+		OutlierScoreAggregator scoreAggregator = new OutlierScoreAggregator(attrWeights.length, attrWeights);
+		double thisScore = 0;
 		for (int ord  :  attrOrdinals) {
 			String keyWithFldOrd = compKey + fieldDelim + ord;
 			double val = Double.parseDouble(items[ord]);
@@ -81,18 +81,15 @@ public class EstimatedCumProbabilityBasedPredictor extends EsimatedAttrtibutePro
 			HistogramStat hist = keyedHist.get(keyWithFldOrd);
 			if (null != hist) {
 				double distr = hist.findCumDistr(val);
-				double thisScore = distr < 0.5 ? 1.0 - distr : distr;
-				score += thisScore * attrWeights[i];
-				totalWt += attrWeights[i];
-				++validCount;
+				thisScore = distr < 0.5 ? 1.0 - distr : distr;
+				scoreAggregator.addScore(thisScore);
 			} else {
 				BasicUtils.assertCondition(!ignoreMissingDistr, "missing distr for key " + keyWithFldOrd);
+				scoreAggregator.addScore();
 			}
-			++i;
 		}
-		if (validCount > 0) {
-			score /=  totalWt ;
-		} 
+		//aggregate score	
+		score = getAggregateScore(scoreAggregator);
 		
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;

@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.beymani.util.OutlierScoreAggregator;
 import org.chombo.stats.HistogramStat;
 import org.chombo.util.BasicUtils;
 import org.chombo.util.ConfigUtility;
@@ -173,9 +174,8 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 	@Override
 	public double execute(String[] items, String compKey) {
 		double score = 0;
-		int i = 0;
-		double totalWt = 0;
-		int validCount = 0;
+		OutlierScoreAggregator scoreAggregator = new OutlierScoreAggregator(attrWeights.length, attrWeights);
+		double thisScore = 0;
 		for (int ord  :  attrOrdinals) {
 			String keyWithFldOrd = compKey + fieldDelim + ord;
 			double val = Double.parseDouble(items[ord]);
@@ -183,7 +183,7 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 			HistogramStat hist = keyedHist.get(keyWithFldOrd);
 			if (null != hist) {
 				double distr = hist.findDistr(val);
-				double thisScore = 0;
+				
 				if (scoreStrategy.equals("inverse")) {
 					thisScore = 1.0 - distr;
 				} else {
@@ -193,17 +193,14 @@ public class EsimatedAttrtibuteProbabilityBasedPredictor extends DistributionBas
 						thisScore = 20.0;
 					}
 				}
-				score += thisScore * attrWeights[i];
-				totalWt += attrWeights[i];
-				++validCount;
+				scoreAggregator.addScore(thisScore);
 			} else {
 				BasicUtils.assertCondition(!ignoreMissingDistr, "missing distr for key " + keyWithFldOrd);
+				scoreAggregator.addScore();
 			}
-			++i;
 		}
-		if (validCount > 0) {
-			score /=  totalWt ;
-		} 
+		//aggregate score	
+		score = getAggregateScore(scoreAggregator);
 		
 		//exponential normalization
 		if (expConst > 0) {

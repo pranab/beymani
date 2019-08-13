@@ -21,7 +21,9 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.beymani.util.OutlierScoreAggregator;
 import org.chombo.stats.HistogramStat;
+import org.chombo.util.BasicUtils;
 
 /**
  * Inter percentile difference (25% and 75%) based predictor
@@ -83,16 +85,14 @@ public class InterPercentileDifferenceBasedPredictor extends EsimatedAttrtibuteP
 	@Override
 	public double execute(String[] items, String compKey) {
 		double score = 0;
-		int i = 0;
-		double totalWt = 0;
-		int validCount = 0;
+		OutlierScoreAggregator scoreAggregator = new OutlierScoreAggregator(attrWeights.length, attrWeights);
+		double thisScore = 0;
 		for (int ord  :  attrOrdinals) {
 			String keyWithFldOrd = compKey + fieldDelim + ord;
 			double val = Double.parseDouble(items[ord]);
 			System.out.println("keyWithFldOrd " + keyWithFldOrd);
 			HistogramStat hist = keyedHist.get(keyWithFldOrd);
 			if (null != hist) {
-				double thisScore = 0;
 				double quarterPercentile = hist.getQuantile(QUARTER_PERECENTILE);
 				double threeQuarterPercentile = hist.getQuantile(THREE_QUARTER_PERECENTILE); 
 				double percentileDiff = threeQuarterPercentile - quarterPercentile;
@@ -101,19 +101,19 @@ public class InterPercentileDifferenceBasedPredictor extends EsimatedAttrtibuteP
 				} else if (val > threeQuarterPercentile){
 					thisScore = (val - threeQuarterPercentile) / percentileDiff;
 				}
-				score += thisScore * attrWeights[i];
-				totalWt += attrWeights[i];
-				++validCount;
+				scoreAggregator.addScore(thisScore);
 			} else {
-				if (!ignoreMissingDistr) {
-					throw new IllegalStateException("missing distr for key " + keyWithFldOrd);
-				}
+				BasicUtils.assertCondition(!ignoreMissingDistr, "missing distr for key " + keyWithFldOrd);
+				scoreAggregator.addScore();
 			}
-			++i;
 		}
-		if (validCount > 0) {
-			score /=  totalWt ;
-		} 
+		//aggregate score	
+		score = getAggregateScore(scoreAggregator);
+		
+		//exponential normalization
+		if (expConst > 0) {
+			score = BasicUtils.expScale(expConst, score);
+		}
 		
 		scoreAboveThreshold = score > scoreThreshold;
 		return score;

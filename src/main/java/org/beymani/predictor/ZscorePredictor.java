@@ -166,7 +166,6 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 	@Override
 	public double execute(String[] items, String compKey) {
 		double score = 0;
-		int i = 0;
 		System.out.println("execute compKey " + compKey);
 		OutlierScoreAggregator scoreAggregator = new OutlierScoreAggregator(attrWeights.length, attrWeights);
 		double thisScore = 0;
@@ -190,7 +189,6 @@ public class ZscorePredictor  extends ModelBasedPredictor{
 				thisScore = (Math.abs( val - statsManager.getMean(ord)) / statsManager.getStdDev(ord));
 				scoreAggregator.addScore(thisScore);
 			}
-			++i;
 		}
 		//aggregate score	
 		score = getAggregateScore(scoreAggregator);
