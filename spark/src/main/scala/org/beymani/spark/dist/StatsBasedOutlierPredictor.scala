@@ -36,9 +36,10 @@ import org.apache.spark.Accumulator
 import org.chombo.spark.common.GeneralUtility
 import org.beymani.predictor.EstimatedMetaProbabilityBasedPredictor
 import org.beymani.predictor.EstimatedCumProbabilityBasedPredictor
+import org.beymani.spark.common.OutlierUtility
 
 
-object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility with GeneralUtility{
+object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility with GeneralUtility with OutlierUtility{
    private val predStrategyZscore = "zscore";
    private val predStrategyRobustZscore = "robustZscore";
    private val predStrategyEstProb = "estimatedProbablity";
@@ -66,7 +67,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   
 	   val predictorStrategy = getMandatoryStringParam(appConfig, "predictor.strategy", "missing prediction strategy")
 	   val predictorStrategies = Array[String]("zscore", "robustZscore", "estimatedProbablity", 
-	       "estimatedAttributeProbablity", "extremeValueProbablity")
+	       "estimatedAttributeProbablity", "extremeValueProbablity", "interPercentileDifference", "estimatedMetaProbablity",
+	       "estimatedCumProbablity")
 	   assertStringMember(predictorStrategy, predictorStrategies, "invalid prediction strategy " + predictorStrategy)
 
 	   val appAlgoConfig = appConfig.getConfig(predictorStrategy)
@@ -74,10 +76,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
-	   val keyFieldOrdinals = keyFields match {
-	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
-	     case None => None  
-	   }
+	   val keyFieldOrdinals =  toOptionalIntArray(keyFields)
+	   
 	   val outputOutliers = getBooleanParamOrElse(appConfig, "output.outliers", false)
 	   val remOutliers = getBooleanParamOrElse(appConfig, "rem.outliers", false)
 	   val cleanDataDirPath = getConditionalMandatoryStringParam(remOutliers, appConfig, "clean.dataDirPath", 
@@ -112,6 +112,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   //outlier polarity high, low or both
 	   val applyPolarity = getBooleanParamOrElse(appConfig, "apply.polarity", false)
 	   val outlierPolarity = getStringParamOrElse(appConfig, "outlier.polarity", "both")
+	   val baseKeyLen = getKeyLength(keyFieldOrdinals, seasonalAnalysis) 
 	   val statValues = 
 	   if (applyPolarity) {
 	     if (getMandatoryIntListParam(appConfig, "attr.ordinals").size() != 1) {
@@ -119,13 +120,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     }
 	     
 	     val statsPath = getMandatoryStringParam(appConfig, "stats.file.path", "missing stat file path")
-	     var keyLen = 0
-	     keyFieldOrdinals match {
-	     	case Some(fields : Array[Integer]) => keyLen +=  fields.length
-	     	case None =>
-	     }
-	     keyLen += (if (seasonalAnalysis) 2 else 0)
-	     keyLen += 1
+	     var keyLen = baseKeyLen + 1
 	     val meanFldOrd = keyLen + getIntParamOrElse(appConfig, "mean.fldOrd",4)
 	     val stdDevFieldOrd = keyLen + getIntParamOrElse(appConfig, "stdDev.fldOrd",6)
 	     //println("keyLen " + keyLen + " meanFldOrd " + meanFldOrd)
@@ -140,6 +135,9 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   //val brMeanValues = sparkCntxt.broadcast(meanValues)
 	   val quantFldOrd = getMandatoryIntListParam(appConfig, "attr.ordinals").get(0).toInt
 	   
+	   //per key threshold
+	   val keyedThresholdFilePath = getOptionalStringParam(appConfig, "path.thresholdByKey")
+
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 
@@ -193,25 +191,22 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val noIgnoredCounter = sparkCntxt.accumulator(0)
 	   val invalidScoreCounter = sparkCntxt.accumulator(0)
 	   
+	   
+	   //predict for each field in each line whether it's an outlier
+	   var keyLen = baseKeyLen
+	   val keyedThresholdValues = getperKeyThreshold(keyedThresholdFilePath, keyLen, keyLen)
+
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
 	   if (remOutliers)
 	     data.cache
-	   
-	   //predict for each field in each line whether it's an outlier
-	   var keyLen = 0
-	   keyFieldOrdinals match {
-	      case Some(fields : Array[Integer]) => keyLen +=  fields.length
-	      case None =>
-	   }
-	   keyLen += (if (seasonalAnalysis) 2 else 0)
-
+	     
 	   var taggedData = data.map(line => {
 		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 		   val key = Record(keyLen)
 		   //partioning fields
 		   keyFieldOrdinals match {
-	           case Some(fields : Array[Integer]) => {
+	           case Some(fields : Array[Int]) => {
 	             for (kf <- fields) {
 	               key.addString(items(kf))
 	             }
@@ -263,7 +258,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			   val keyStr = key.toString
 			   val predictor = brPredictor.value
 			   val score:java.lang.Double = predictor.execute(items, keyStr)
-			   var marker = if (score > scoreThreshold) "O"  else "N"
+			   val threshold = getThreshold(key, keyedThresholdValues, scoreThreshold)
+			   var marker = if (score > threshold) "O"  else "N"
 			   if (!predictor.isValid(keyStr))  {
 			     //invalid prediction because of missing model
 			     marker = "I"
