@@ -86,7 +86,6 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   
 	   //seasonal data
 	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
-	   val partBySeasonCycle = getBooleanParamOrElse(appConfig, "part.bySeasonCycle", true)
 	   val analyzerMap = scala.collection.mutable.Map[String, (SeasonalAnalyzer, Int)]()
 	   val seasonalAnalyzers = if (seasonalAnalysis) {
 		   	val seasonalCycleTypes = getMandatoryStringListParam(appConfig, "seasonal.cycleType", 

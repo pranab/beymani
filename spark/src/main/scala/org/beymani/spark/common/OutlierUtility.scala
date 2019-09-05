@@ -77,6 +77,17 @@ trait OutlierUtility {
 	 
 	 tData
 	}
+
+	/**
+	 * @param fieldDelimIn
+	 * @param thresholdNorm
+	 * @param taggedData
+	 * @return
+	 */
+	def processTaggedData(fieldDelimIn:String, thresholdNorm: Option[Double], taggedData:RDD[String]) : RDD[String] = {
+	  return processTaggedData(false, false, null, fieldDelimIn, null, thresholdNorm, 
+	    taggedData:RDD[String], null)
+	}
 	
 	/**
 	 * @param keyedThresholdFilePath

@@ -28,13 +28,14 @@ import org.hoidla.window.SizeBoundPredictorWindow
 import org.chombo.stats.SimpleStat
 import org.chombo.math.MathUtils
 import org.beymani.spark.common.OutlierUtility
+import org.chombo.spark.common.GeneralUtility
 
 /**
  * Anomaly detection in sequence data based on one step ahead prediction
  * @author pranab
  *
  */
-object OneStepAheadPredictor extends JobConfiguration with OutlierUtility {
+object OneStepAheadPredictor extends JobConfiguration with GeneralUtility with OutlierUtility {
   
    /**
    * @param args
@@ -54,81 +55,46 @@ object OneStepAheadPredictor extends JobConfiguration with OutlierUtility {
 	   val predictorStrategy = getStringParamOrElse(appConfig, "predictor.strategy", 
 	       SizeBoundPredictorWindow.PRED_AVERAGE)
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
-	   val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
-	   val keyFieldOrdinals = keyFields match {
-	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
-	     case None => None  
-	   }
-	   
-	  val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
-	  val attrOrdsList = attrOrds.toList
-	  val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
-	  val outputOutliers = getBooleanParamOrElse(appConfig, "output.outliers", false)
-	  val remOutliers = getBooleanParamOrElse(appConfig, "rem.outliers", false)
-	  val cleanDataDirPath = getConditionalMandatoryStringParam(remOutliers, appConfig, "clean.dataDirPath", 
-	       "missing clean data file output directory")
-	  val statDataDirPath = getMandatoryStringParam(appConfig, "stat.dataDirPath", 
+	   val keyFieldOrdinals = toOptionalIntArray(getOptionalIntListParam(appConfig, "id.fieldOrdinals"))
+	   val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
+	   val attrOrdsList = attrOrds.toList
+	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
+	   val statDataDirPath = getMandatoryStringParam(appConfig, "stat.dataDirPath", 
 	       "missing stat file output directory path")
-	  val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	   
-	  val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
-	  val expConst = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
-	  val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
-	  val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
-	  val windowSize = getIntParamOrElse(appConfig, "window.size", 3)
-	  val minStatCount = getIntParamOrElse(appConfig, "min.statCount", 5)
-	  val rangeConfLevel = getDoubleParamOrElse(appConfig, "range.confLevel", 0.95)
-	  val tDistVal = MathUtils.linearInterpolate(MathUtils.tDistr, rangeConfLevel)
-	  val statTag = "$STAT$"
-	  val averagingWeights = if (predictorStrategy.equals(SizeBoundPredictorWindow.PRED_WEIGHTED_AVERAGE)) {
-	     val wtList = getMandatoryDoubleListParam(appConfig, "averaging.weights", "missing averaging weights")
-	     BasicUtils.fromListToDoubleArray(wtList)
-	  } else {
-	     null
-	  }
-	   
-	  val expSmoothFactor = if (predictorStrategy.equals(SizeBoundPredictorWindow.PRED_EXP_SMOOTHING)) {
-	     getMandatoryDoubleParam(appConfig, "exp.smoothFactor", "missing exponential smoothing factor")
-	   } else {
-	     0
-	  }
+	       val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	   
+	   val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
+	   val expConst = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
+	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
+	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
+	   val windowSize = getIntParamOrElse(appConfig, "window.size", 3)
+	   val minStatCount = getIntParamOrElse(appConfig, "min.statCount", 5)
+	   val rangeConfLevel = getDoubleParamOrElse(appConfig, "range.confLevel", 0.95)
+	   val tDistVal = MathUtils.linearInterpolate(MathUtils.tDistr, rangeConfLevel)
+	   val statTag = "$STAT$"
+	   val averagingWeightsList  = getConditionalMandatoryDoubleListParam(predictorStrategy.equals(SizeBoundPredictorWindow.PRED_WEIGHTED_AVERAGE), 
+	       appConfig, "averaging.weights", "missing averaging weights", false)
+	   val averagingWeights = toDoubleArray(averagingWeightsList) 
+	   val expSmoothFactor = getConditionalMandatoryDoubleParam(predictorStrategy.equals(SizeBoundPredictorWindow.PRED_EXP_SMOOTHING), 
+	       appConfig, "exp.smoothFactor", "missing exponential smoothing factor")
 	  
-	  //residue stats
-	  val resStatFilePath = getMandatoryStringParam(appConfig, "res.statFilePath", "missing residute stats file")
-	  val resStats = getResidueStats(resStatFilePath, fieldDelimIn)
-	  val brResStats = sparkCntxt.broadcast(resStats)
+	   //residue stats
+	   val resStatFilePath = getMandatoryStringParam(appConfig, "res.statFilePath", "missing residute stats file")
+	   val resStats = getResidueStats(resStatFilePath, fieldDelimIn)
+	   val brResStats = sparkCntxt.broadcast(resStats)
 	  
-	  val debugOn = appConfig.getBoolean("debug.on")
-	  val saveOutput = appConfig.getBoolean("save.output")
-	  
-	  //for sorting by sequence
-	  val sortFields = Array[Int](1)
-	  sortFields(0) = 0
+	   val debugOn = appConfig.getBoolean("debug.on")
+	   val saveOutput = appConfig.getBoolean("save.output")
 
-	  var keyLen = 0
-	  keyFieldOrdinals match {
-	    case Some(fields : Array[Integer]) => keyLen +=  fields.length
-	    case None =>
-	  }
+	  val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
 	   
-	 //input
-	 val data = sparkCntxt.textFile(inputPath)
-	 if (remOutliers)
-	   data.cache
+	  //input
+	  val data = sparkCntxt.textFile(inputPath)
 	   
-	 val keyedData = data.map(line => {
+	  val keyedData = data.map(line => {
 	   val items = line.split(fieldDelimIn, -1)
 	   val key = Record(keyLen)
+	   populateFields(items, keyFieldOrdinals, key, "all")
 
-	   //partitioning fields
-	   keyFieldOrdinals match {
-           case Some(fields : Array[Integer]) => {
-             for (kf <- fields) {
-               key.addString(items(kf))
-             }
-           }
-           case None =>
-       }
-	   
 	   val value = Record(2)
 	   val seq = items(seqFieldOrd).toLong
 	   value.addLong(seq)
@@ -212,8 +178,7 @@ object OneStepAheadPredictor extends JobConfiguration with OutlierUtility {
 	 statData.saveAsTextFile(statDataDirPath) 
 	 
 	 //process tagged records
-	 taggedData = processTaggedData(outputOutliers, remOutliers, cleanDataDirPath,fieldDelimIn, fieldDelimOut, 
-	     thresholdNorm, taggedData, data)	 	
+	 taggedData = processTaggedData(fieldDelimIn, thresholdNorm, taggedData)	 	
 
 	 if (debugOn) {
          val records = taggedData.collect
