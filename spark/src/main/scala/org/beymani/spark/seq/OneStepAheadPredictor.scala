@@ -74,8 +74,8 @@ object OneStepAheadPredictor extends JobConfiguration with GeneralUtility with O
 	   val averagingWeightsList  = getConditionalMandatoryDoubleListParam(predictorStrategy.equals(SizeBoundPredictorWindow.PRED_WEIGHTED_AVERAGE), 
 	       appConfig, "averaging.weights", "missing averaging weights", false)
 	   val averagingWeights = toDoubleArray(averagingWeightsList) 
-	   val expSmoothFactor = getConditionalMandatoryDoubleParam(predictorStrategy.equals(SizeBoundPredictorWindow.PRED_EXP_SMOOTHING), 
-	       appConfig, "exp.smoothFactor", "missing exponential smoothing factor")
+	   val expSmoothParams = toStringArray(getConditionalMandatoryStringListParam(predictorStrategy.equals(SizeBoundPredictorWindow.PRED_EXP_SMOOTHING), 
+	       appConfig, "exp.smoothFactor", "missing exponential smoothing factor", false))
 	  
 	   //residue stats
 	   val resStatFilePath = getMandatoryStringParam(appConfig, "res.statFilePath", "missing residute stats file")
@@ -110,7 +110,11 @@ object OneStepAheadPredictor extends JobConfiguration with GeneralUtility with O
 	   //window
 	   var windows = Map[Int, SizeBoundPredictorWindow]()
 	   attrOrdsList.foreach(i => {
-	     windows += (i -> new SizeBoundPredictorWindow(windowSize, predictorStrategy))
+	     val window = new SizeBoundPredictorWindow(windowSize, predictorStrategy)
+	     if (predictorStrategy.equals(SizeBoundPredictorWindow.PRED_EXP_SMOOTHING)) {
+	    	 window.withConfigParams(expSmoothParams)
+	     }
+	     windows += (i -> window)
 	   })
 	   
 	   //residue stats
