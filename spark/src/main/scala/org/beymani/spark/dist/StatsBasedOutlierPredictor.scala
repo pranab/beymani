@@ -50,6 +50,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    private val predStrategyEstCumProb = "estimatedCumProbablity";
    
    /**
+   * Outlier detection with various statistical techniques
    * @param args
    * @return
    */
@@ -64,6 +65,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   //configuration params
 	   val fieldDelimIn = appConfig.getString("field.delim.in")
 	   val fieldDelimOut = appConfig.getString("field.delim.out")
+	   val quotedFields = getBooleanParamOrElse(appConfig, "field.under.quote", false);
 	   
 	   val predictorStrategy = getMandatoryStringParam(appConfig, "predictor.strategy", "missing prediction strategy")
 	   val predictorStrategies = Array[String]("zscore", "robustZscore", "estimatedProbablity", 
@@ -86,24 +88,8 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   
 	   //seasonal data
 	   val seasonalAnalysis = getBooleanParamOrElse(appConfig, "seasonal.analysis", false)
-	   val analyzerMap = scala.collection.mutable.Map[String, (SeasonalAnalyzer, Int)]()
-	   val seasonalAnalyzers = if (seasonalAnalysis) {
-		   	val seasonalCycleTypes = getMandatoryStringListParam(appConfig, "seasonal.cycleType", 
-	        "missing seasonal cycle type").asScala.toArray
-	        val timeZoneShiftHours = getIntParamOrElse(appConfig, "time.zoneShiftHours", 0)
-	        val timeStampFieldOrdinal = getMandatoryIntParam(appConfig, "time.fieldOrdinal", 
-	        "missing time stamp field ordinal")
-	        val timeStampInMili = getBooleanParamOrElse(appConfig, "time.inMili", true)
-	        
-	        val analyzers = seasonalCycleTypes.map(sType => {
-	        	val seasonalAnalyzer = createSeasonalAnalyzer(this, appConfig, sType, timeZoneShiftHours, timeStampInMili)
-	        	analyzerMap += (sType -> (seasonalAnalyzer, timeStampFieldOrdinal))
-	        	seasonalAnalyzer
-	        })
-	        Some((analyzers, timeStampFieldOrdinal))
-	   } else {
-		   	None
-	   }
+	   val seasonalAnalyzers = creatOptionalSeasonalAnalyzerArray(this, appConfig, seasonalAnalysis)
+	   val analyzerMap = getSeasonalMap(this, appConfig, seasonalAnalyzers)
 	   
 	   //soft threshold below actual
 	   val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
@@ -201,17 +187,9 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     data.cache
 	     
 	   var taggedData = data.map(line => {
-		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
+		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn, quotedFields)
 		   val key = Record(keyLen)
-		   //partioning fields
-		   keyFieldOrdinals match {
-	           case Some(fields : Array[Int]) => {
-	             for (kf <- fields) {
-	               key.addString(items(kf))
-	             }
-	           }
-	           case None =>
-	       }
+		   Record.populateFieldsWithIndex(items, keyFieldOrdinals, key)
 		   
 		   seasonalTypeFldOrd match {
 		     //seasonal type field in data
