@@ -24,6 +24,7 @@ libraryDependencies ++=Seq(
   "mawazo" %% "chombo" % "1.0",
   "mawazo" %% "beymani" % "1.0",
   "mawazo" %% "hoidla" % "1.0",
+  "mawazo" %% "avenir" % "1.0",
   "gov.nist.math" % "jama" % "1.0.3"
 )
 

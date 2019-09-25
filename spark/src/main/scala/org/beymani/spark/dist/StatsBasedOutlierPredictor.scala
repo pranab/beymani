@@ -38,7 +38,11 @@ import org.beymani.predictor.EstimatedMetaProbabilityBasedPredictor
 import org.beymani.predictor.EstimatedCumProbabilityBasedPredictor
 import org.beymani.spark.common.OutlierUtility
 
-
+/**
+* Stats based outlier prediction
+* @author pranab
+* 
+*/
 object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility with GeneralUtility with OutlierUtility{
    private val predStrategyZscore = "zscore";
    private val predStrategyRobustZscore = "robustZscore";
