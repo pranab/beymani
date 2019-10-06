@@ -71,8 +71,7 @@ object PrincipalComponentPredictor extends JobConfiguration with GeneralUtility 
 	   }
 	   val pcMa = updateMapValues(compState, pcFun)
 	   
-	   
-	   val data = sparkCntxt.textFile(inputPath).cache
+	   val data = sparkCntxt.textFile(inputPath)
 	   val taggedData = data.map(line => {
 		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 		   val keyRec = Record(items, keyFieldOrdinals)
