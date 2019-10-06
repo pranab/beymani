@@ -75,10 +75,11 @@ object ClusterBasedPredictor extends JobConfiguration with GeneralUtility with S
 	   val clusterDataFilePath = getMandatoryStringParam(appConfig, "cluster.dataPath", "missing cluster data file path")
 	   
 	   val keyedClusters = ClusterUtility.load(clusterDataFilePath, fieldDelimOut, keyLen).asScala.toMap
-	   val tarnsformer = (v:java.util.List[ClusterData]) => {
-	     ClusterUtility.labelSize(v, largeClusterSizeFraction, largeClusterSizeMultilier)
-	   }
-	   updateMapValues(keyedClusters, tarnsformer)
+	   keyedClusters.foreach(r => {
+	     ClusterUtility.labelSize(r._2, largeClusterSizeFraction, largeClusterSizeMultilier)
+	   })
+	   
+	   
 	   val seasonalAnalyzers = creatOptionalSeasonalAnalyzerArray(this, appConfig, seasonalAnalysis)
 	   
 	   //input
