@@ -18,6 +18,7 @@
 package org.beymani.util;
 
 import java.io.Serializable;
+import java.util.List;
 
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
@@ -30,11 +31,19 @@ public class DataStream implements Serializable{
 	private String id;
 	private String type;
 	private String parentId;
-	private String[] childrenId;
+	private String parentType;
+	private List<String> childrenId;
+	private boolean singleton;
 	
+	/**
+	 * 
+	 */
 	public DataStream() {
 	}
 
+	/**
+	 * @return
+	 */
 	public String getId() {
 		return id;
 	}
@@ -59,12 +68,28 @@ public class DataStream implements Serializable{
 		this.parentId = parentId;
 	}
 
-	public String[] getChildrenId() {
+	public String getParentType() {
+		return parentType;
+	}
+
+	public void setParentType(String parentType) {
+		this.parentType = parentType;
+	}
+
+	public List<String> getChildrenId() {
 		return childrenId;
 	}
 
-	public void setChildrenId(String[] childrenId) {
+	public void setChildrenId(List<String> childrenId) {
 		this.childrenId = childrenId;
+	}
+
+	public boolean isSingleton() {
+		return singleton;
+	}
+
+	public void setSingleton(boolean singleton) {
+		this.singleton = singleton;
 	}
 
 }
