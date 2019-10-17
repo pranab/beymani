@@ -7,10 +7,6 @@ MASTER=spark://akash:7077
 
 case "$1" in
 
-*) 
-	echo "unknown operation $1"
-	;;
-
 "numStat")
 	echo "running NumericalAttrStats Spark job"
 	CLASS_NAME=org.chombo.spark.explore.NumericalAttrStats
@@ -18,7 +14,7 @@ case "$1" in
 	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/ecom/stat
 	rm -rf ./output/ecom/stat
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
-	--conf spark.ui.killEnabled=true --master $MASTER $CHOMBO_JAR_NAME  $INPUT $OUTPUT ecSale.conf
+	--conf spark.ui.killEnabled=true --master $MASTER $CHOMBO_JAR_NAME  $INPUT $OUTPUT ecomm.conf
 ;;
 
 "numMstat")
@@ -28,7 +24,8 @@ case "$1" in
 	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/ecom/mstat
 	rm -rf ./output/ecom/mstat
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
-	--conf spark.ui.killEnabled=true --master $MASTER $CHOMBO_JAR_NAME  $INPUT $OUTPUT ecSale.conf
+	--conf spark.ui.killEnabled=true --master $MASTER $CHOMBO_JAR_NAME  $INPUT $OUTPUT ecomm.conf
+	rm ./output/ecom/mstat/_SUCCESS
 	ls -l ./output/ecom/mstat
 ;;
 
@@ -37,19 +34,20 @@ case "$1" in
 	MED_FILES=$PROJECT_HOME/bin/beymani/output/ecom/mstat/*
 	META_DIR=$PROJECT_HOME/bin/beymani/meta/ecom
 	META_FILE=$META_DIR/$2
+	echo "copying to $META_FILE"
 	cp /dev/null $META_FILE
 	for f in $MED_FILES
 	do
   		echo "Copying file $f ..."
   		cat $f >> $META_FILE
 	done
-	ls -l $META_DIR
+	ls -l $META_FILE
 ;;
 
 "cpMod")
 	echo "copying model files files from backup"
 	META_DIR=$PROJECT_HOME/bin/beymani/meta/ecom
-	cp $META_DIR/$2/*  $META_DIR/
+	cp $META_DIR/$2  $META_DIR/
 	ls -l $META_DIR
 ;;
 
@@ -60,7 +58,7 @@ case "$1" in
 	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/ecom/olp
 	rm -rf ./output/ecom/olp
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
-	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT ecSale.conf
+	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT ecomm.conf
 	ls -l ./output/ecom/olp
 ;;
 
@@ -88,6 +86,8 @@ case "$1" in
 	ls -l $BK_DIR
 ;;
 
-
+*) 
+	echo "unknown operation $1"
+	;;
 
 esac

@@ -31,7 +31,7 @@ if __name__ == "__main__":
 	op = sys.argv[1]
 
 	#generate sales stat
-	if op == "prstat":
+	if op == "prStat":
 		bDailySeasMean = [91,85,67,42,37,25,43,79,102,140,173,288,404,486,388,334,381,427,319,423,563,442,261,167]
 		bRemStdDev = 10
 		
@@ -52,9 +52,9 @@ if __name__ == "__main__":
 			print "%s,%s" %(id,ms)
 			
 	#generate sales data		
-	elif op == "prsale":
+	elif op == "prSale":
 		statFile = sys.argv[2]
-		numDays = int(sys.argv[3])
+		interval = int(sys.argv[3])
 
 		prStat = dict()
 		for rec in fileRecGen(statFile, ","):
@@ -70,11 +70,11 @@ if __name__ == "__main__":
 			samplers = list(map(lambda d: GaussianRejectSampler(d[0],d[1]), zip(dailySeasMean, dailySeasStdDev)))	
 			prStat[pid] = samplers
 		
-		numHours = 	24 * numDays 
-		(cTime, pTime) = pastTime(numDays)
+		(cTime, pTime) = pastTime(interval, sys.argv[4])
 		pTime = hourAlign(pTime)
 		sTime = pTime
 		sIntv = secInHour
+		#print pTime, cTime
 		
 		ids = prStat.keys()
 		while sTime < cTime:
@@ -86,6 +86,24 @@ if __name__ == "__main__":
 				total = int(quant)
 				total =  minLimit(total, 0)
 				print "prodSale,%s,%d,%d" %(pid,sTime,total)  
-				sTime += sIntv
-			
+			sTime += sIntv
+
+	#insert outliers in sales data		
+	elif op == "olPrSale":			
+		fileName = sys.argv[2]
+		count = 0
+		for rec in fileRecGen(fileName, ","):
+			if isEventSampled(10):
+				quant = int(rec[3])
+				if (isEventSampled(30)):
+					quant += 100
+				else:
+					quant -= 200
+					if (quant < 0):
+						quant = 0
+				count += 1
+				rec[3] = str(quant)
+			mrec = ",".join(rec)
+			print mrec
+		#print count
 			
