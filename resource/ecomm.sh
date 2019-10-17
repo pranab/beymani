@@ -60,6 +60,7 @@ case "$1" in
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
 	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT ecomm.conf
 	ls -l ./output/ecom/olp
+	cat ./output/ecom/olp/part-00000 | grep ,O 
 ;;
 
 "chkOl")
@@ -85,6 +86,19 @@ case "$1" in
 	done
 	ls -l $BK_DIR
 ;;
+
+"aggrOl")
+	echo "running OutlierAggregator Spark job"
+	CLASS_NAME=org.beymani.spark.common.OutlierAggregator
+	INPUT=file:///Users/pranab/Projects/bin/beymani/input/ecom/aggr/*
+	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/ecom/aggr
+	rm -rf ./output/ecom/aggr
+	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
+	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT ecomm.conf
+	ls -l ./output/ecom/aggr
+	cat ./output/ecom/aggr/part-00000 | grep ,O 
+;;
+
 
 *) 
 	echo "unknown operation $1"

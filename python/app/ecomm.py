@@ -91,14 +91,15 @@ if __name__ == "__main__":
 	#insert outliers in sales data		
 	elif op == "olPrSale":			
 		fileName = sys.argv[2]
+		olRate = int(sys.argv[3])
 		count = 0
 		for rec in fileRecGen(fileName, ","):
-			if isEventSampled(10):
+			if isEventSampled(olRate):
 				quant = int(rec[3])
 				if (isEventSampled(30)):
-					quant += 100
+					quant += 200
 				else:
-					quant -= 200
+					quant -= 300
 					if (quant < 0):
 						quant = 0
 				count += 1

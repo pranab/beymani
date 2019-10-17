@@ -1,0 +1,17 @@
+{
+	"dataStreams" :
+	[
+		{
+			"id" : "corpSale",
+			"type" : "sale",
+			"parentId" : "none",
+			"parentType" : "none"
+		},
+		{
+			"id" : "*",
+			"type" : "prodSale",
+			"parentId" : "none",
+			"parentType" : "sale"
+		}
+	]
+}

@@ -88,7 +88,7 @@ public class DataStreamSchema implements Serializable {
 	public DataStream findParent(String type, String id) {
 		DataStream parentStream = null;
 		DataStream stream = findByType(type);
-		if (null != stream.getId()) {
+		if (!stream.getId().equals("*")) {
 			//instance based
 			stream = findByTypeAndId(type, id);
 			parentStream = findByTypeAndId(stream.getParentType(), stream.getParentId());
