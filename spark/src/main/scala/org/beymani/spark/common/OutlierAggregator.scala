@@ -54,6 +54,7 @@ object OutlierAggregator extends JobConfiguration with GeneralUtility {
 	   val idFieldOrd = getMandatoryIntParam( appConfig, "id.field.ordinal", "missing type field ordinal") 
 	   val seqFieldOrd = getMandatoryIntParam( appConfig, "seq.field.ordinal", "missing sequence field ordinal") 
 	   val quantFieldOrd = getMandatoryIntParam( appConfig, "quant.field.ordinal", "missing quant field ordinal") 
+	   val aggrStrategy = getStringParamOrElse(appConfig, "aggr.strategy", "average")
 	   val streamSchmeFilePath = getMandatoryStringParam( appConfig, "stream.schmaFilePath", "missing data stream schema file path") 
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val debugOn = appConfig.getBoolean("debug.on")
@@ -81,18 +82,18 @@ object OutlierAggregator extends JobConfiguration with GeneralUtility {
 	     if (singleton) {
 	         //same parent all instances
 	    	 val outliers = values.filter(v => v(recLen - 1).equals("O"))
-		     val (avValue, avScore, tag) = 
+		     val (aggrValue, aggrScore, tag) = 
 		     if (outliers.length > 0) {
-		       val avScore = getColumnAverage(outliers, recLen - 2)
-		       val avValue = getColumnAverage(outliers, quantFieldOrd)
-		       (avValue, avScore, "O")
+		       val aggrScore = getAggregate(outliers, recLen - 2, aggrStrategy)
+		       val aggrValue = getAggregate(outliers, quantFieldOrd, aggrStrategy)
+		       (aggrValue, aggrScore, "O")
 		     } else {
-		       val avScore = getColumnAverage(values, recLen - 2)
-		       val avValue = getColumnAverage(values, quantFieldOrd)
-		       (avValue, avScore, "N")
+		       val aggrScore = getAggregate(values, recLen - 2, aggrStrategy)
+		       val aggrValue = getAggregate(values, quantFieldOrd, aggrStrategy)
+		       (aggrValue, aggrScore, "N")
 		     }
-		     parRecs += formatOutput(parentStream.getType, parentStream.getId, timeStamp, avValue, 
-		         avScore, tag, fieldDelimOut, precision)
+		     parRecs += formatOutput(parentStream.getType, parentStream.getId, timeStamp, aggrValue, 
+		         aggrScore, tag, fieldDelimOut, precision)
 	     } else {
 	       values.groupBy(v => {
 	         (v(0), v(1))
@@ -101,18 +102,18 @@ object OutlierAggregator extends JobConfiguration with GeneralUtility {
 	         val parentStream = streamSchema.findParent(key._1, key._2)
 	         val values = r._2
 	         val outliers = values.filter(v => v(recLen - 1).equals("O"))
-	         val (avValue, avScore, tag) = 
+	         val (aggrValue, aggrScore, tag) = 
 	         if (outliers.length > 0) {
-	           val avScore = getColumnAverage(outliers, recLen - 2)
-		       val avValue = getColumnAverage(outliers, quantFieldOrd)
-		       (avValue, avScore, "O")
+	           val aggrScore = getAggregate(outliers, recLen - 2, aggrStrategy)
+		       val aggrValue = getAggregate(outliers, quantFieldOrd, aggrStrategy)
+		       (aggrValue, aggrScore, "O")
 	         } else {
-		       val avScore = getColumnAverage(values, recLen - 2)
-		       val avValue = getColumnAverage(values, quantFieldOrd)
-		       (avValue, avScore, "N")
+		       val aggrScore = getAggregate(values, recLen - 2, aggrStrategy)
+		       val aggrValue = getAggregate(values, quantFieldOrd, aggrStrategy)
+		       (aggrValue, aggrScore, "N")
 	         }
-		     parRecs += formatOutput(parentStream.getType, parentStream.getId, timeStamp, avValue, 
-		         avScore, tag, fieldDelimOut, precision)
+		     parRecs += formatOutput(parentStream.getType, parentStream.getId, timeStamp, aggrValue, 
+		         aggrScore, tag, fieldDelimOut, precision)
 	       })
 	     }
 	     parRecs
@@ -145,5 +146,22 @@ object OutlierAggregator extends JobConfiguration with GeneralUtility {
 	   append(fieldDelimOut).append(tag)
      strBld.toString
    }
+  
+  /**
+  * @param values
+  * @param filedOrdinal
+  * @param aggrStrategy
+  */
+  def getAggregate(values:Array[Array[String]], filedOrdinal:Int, aggrStrategy:String) : Double =  {
+    var value = 0.0
+    if (aggrStrategy.equals("average")) {
+      value = getColumnAverage(values, filedOrdinal)
+    } else if (aggrStrategy.equals("max")) {
+	  value = getColumnMax(values, filedOrdinal)
+    } else {
+      BasicUtils.assertFail("invalid aggregation strategy")
+    }
+    value
+  }
 
 }
