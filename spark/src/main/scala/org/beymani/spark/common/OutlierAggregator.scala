@@ -116,7 +116,10 @@ object OutlierAggregator extends JobConfiguration with GeneralUtility {
 	       })
 	     }
 	     parRecs
-	   })
+	   }).sortBy(line => {
+	     val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
+	     items(seqFieldOrd).toLong
+	   }, true, 1)
 
 	  if (debugOn) {
 	     parentData.collect.slice(0,50).foreach(s => println(s))

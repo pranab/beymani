@@ -2,10 +2,16 @@
 	"dataStreams" :
 	[
 		{
+			"id" : "corp",
+			"type" : "root",
+			"parentId" : "none",
+			"parentType" : "none"
+		},
+		{
 			"id" : "corpSale",
 			"type" : "sale",
 			"parentId" : "none",
-			"parentType" : "none"
+			"parentType" : "root"
 		},
 		{
 			"id" : "*",

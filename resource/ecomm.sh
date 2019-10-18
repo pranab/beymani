@@ -59,6 +59,7 @@ case "$1" in
 	rm -rf ./output/ecom/olp
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
 	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT ecomm.conf
+	rm ./output/ecom/olp/_SUCCESS
 	ls -l ./output/ecom/olp
 	cat ./output/ecom/olp/part-00000 | grep ,O 
 ;;
@@ -74,9 +75,9 @@ case "$1" in
 ;;
 
 "bkOut")
-	echo "backing up output files"
+	echo "backing up outlier output files"
 	OUT_FILES=$PROJECT_HOME/bin/beymani/output/ecom/olp/*
-	BK_DIR=$PROJECT_HOME/bin/beymani/output/ecom
+	BK_DIR=$PROJECT_HOME/bin/beymani/output/ecom/bkup
 	BK_FILE=$BK_DIR/$2
 	cp /dev/null $BK_FILE
 	for f in $OUT_FILES
@@ -87,6 +88,15 @@ case "$1" in
 	ls -l $BK_DIR
 ;;
 
+"cpOut")
+	echo "copying outlier output files for aggregation"
+	IN_DIR=$PROJECT_HOME/bin/beymani/input/ecom/aggr/
+	BK_DIR=$PROJECT_HOME/bin/beymani/output/ecom/bkup
+	cp $BK_DIR/$2 $IN_DIR
+	ls -l $IN_DIR
+;;
+
+
 "aggrOl")
 	echo "running OutlierAggregator Spark job"
 	CLASS_NAME=org.beymani.spark.common.OutlierAggregator
@@ -95,6 +105,7 @@ case "$1" in
 	rm -rf ./output/ecom/aggr
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
 	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT ecomm.conf
+	rm ./output/ecom/aggr/_SUCCESS
 	ls -l ./output/ecom/aggr
 	cat ./output/ecom/aggr/part-00000 | grep ,O 
 ;;
