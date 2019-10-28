@@ -65,58 +65,34 @@ object OutlierAggregator extends JobConfiguration with GeneralUtility {
 	   val data = sparkCntxt.textFile(inputPath)
 	   val parentData = data.map(line => {
 		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
-		   val keyRec = Record(2)
-		   keyRec.addString(items(typeFieldOrd))
+		   val keyRec = Record(3)
+		   val recType = items(typeFieldOrd)
+		   val recId = items(idFieldOrd)
+		   val parentStream = streamSchema.findParent(recType, recId)
+		   
+		   keyRec.addString(parentStream.getType())
+		   keyRec.addString(parentStream.getId())
 		   keyRec.addLong(items(seqFieldOrd).toLong)
 		   (keyRec, line)
-	   }).groupByKey.flatMap(r => {
+	   }).groupByKey.map(r => {
+	     val keyRec = r._1
 	     val values = r._2.toArray.map(v => BasicUtils.getTrimmedFields(v, fieldDelimIn))
 	     val recLen = values(0).length
-	     val id = values(0)(idFieldOrd)
-	     val strType = r._1.getString(0)
-	     val timeStamp = r._1.getLong(1)
-	     val parentStream = streamSchema.findParent(strType, id)
-	     val singleton = parentStream.isSingleton
+	     val timeStamp = keyRec.getLong(2)
 	     
-	     val parRecs = ArrayBuffer[String]()
-	     if (singleton) {
-	         //same parent all instances
-	    	 val outliers = values.filter(v => v(recLen - 1).equals("O"))
-		     val (aggrValue, aggrScore, tag) = 
-		     if (outliers.length > 0) {
-		       val aggrScore = getAggregate(outliers, recLen - 2, aggrStrategy)
-		       val aggrValue = getAggregate(outliers, quantFieldOrd, aggrStrategy)
-		       (aggrValue, aggrScore, "O")
-		     } else {
-		       val aggrScore = getAggregate(values, recLen - 2, aggrStrategy)
-		       val aggrValue = getAggregate(values, quantFieldOrd, aggrStrategy)
-		       (aggrValue, aggrScore, "N")
-		     }
-		     parRecs += formatOutput(parentStream.getType, parentStream.getId, timeStamp, aggrValue, 
-		         aggrScore, tag, fieldDelimOut, precision)
+    	 val outliers = values.filter(v => v(recLen - 1).equals("O"))
+	     val (aggrValue, aggrScore, tag) = 
+	     if (outliers.length > 0) {
+	       val aggrScore = getAggregate(outliers, recLen - 2, aggrStrategy)
+	       val aggrValue = getAggregate(outliers, quantFieldOrd, aggrStrategy)
+	       (aggrValue, aggrScore, "O")
 	     } else {
-	       values.groupBy(v => {
-	         (v(0), v(1))
-	       }).foreach(r => {
-	         val key = r._1
-	         val parentStream = streamSchema.findParent(key._1, key._2)
-	         val values = r._2
-	         val outliers = values.filter(v => v(recLen - 1).equals("O"))
-	         val (aggrValue, aggrScore, tag) = 
-	         if (outliers.length > 0) {
-	           val aggrScore = getAggregate(outliers, recLen - 2, aggrStrategy)
-		       val aggrValue = getAggregate(outliers, quantFieldOrd, aggrStrategy)
-		       (aggrValue, aggrScore, "O")
-	         } else {
-		       val aggrScore = getAggregate(values, recLen - 2, aggrStrategy)
-		       val aggrValue = getAggregate(values, quantFieldOrd, aggrStrategy)
-		       (aggrValue, aggrScore, "N")
-	         }
-		     parRecs += formatOutput(parentStream.getType, parentStream.getId, timeStamp, aggrValue, 
-		         aggrScore, tag, fieldDelimOut, precision)
-	       })
+	       val aggrScore = getAggregate(values, recLen - 2, aggrStrategy)
+	       val aggrValue = getAggregate(values, quantFieldOrd, aggrStrategy)
+	       (aggrValue, aggrScore, "N")
 	     }
-	     parRecs
+	     formatOutput(keyRec.getString(0), keyRec.getString(1), timeStamp, aggrValue, 
+	         aggrScore, tag, fieldDelimOut, precision)
 	   }).sortBy(line => {
 	     val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 	     items(seqFieldOrd).toLong

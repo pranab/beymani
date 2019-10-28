@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.Serializable;
 import java.util.List;
 
+import org.chombo.util.BasicUtils;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
 
@@ -88,16 +89,24 @@ public class DataStreamSchema implements Serializable {
 	public DataStream findParent(String type, String id) {
 		DataStream parentStream = null;
 		DataStream stream = findByType(type);
-		if (!stream.getId().equals("*")) {
+		BasicUtils.assertNotNull(stream, "coud not find data stream object");
+		parentStream = findByType(stream.getParentType());
+		if (!parentStream.isSingleton()) {
 			//instance based
 			stream = findByTypeAndId(type, id);
 			parentStream = findByTypeAndId(stream.getParentType(), stream.getParentId());
-		} else {
-			//type based
-			parentStream = findByType(stream.getParentType());
-			parentStream.setSingleton(true);
-		}
+		} 
 		return parentStream;
+	}
+
+	/**
+	 * @param type
+	 * @return
+	 */
+	public String findParentType(String type) {
+		DataStream stream = findByType(type);
+		BasicUtils.assertNotNull(stream, "coud not find data stream object");
+		return stream.getParentType();
 	}
 	
 	/**

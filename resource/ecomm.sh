@@ -7,6 +7,13 @@ MASTER=spark://akash:7077
 
 case "$1" in
 
+"loadInp")
+	rm $PROJECT_HOME/bin/beymani/input/ecom/$3/*
+	cp $2 $PROJECT_HOME/bin/beymani/input/ecom/$3/
+	ls -l $PROJECT_HOME/bin/beymani/input/ecom/$3/
+;;
+
+
 "numStat")
 	echo "running NumericalAttrStats Spark job"
 	CLASS_NAME=org.chombo.spark.explore.NumericalAttrStats
@@ -85,10 +92,17 @@ case "$1" in
   		echo "Copying file $f ..."
   		cat $f >> $BK_FILE
 	done
-	ls -l $BK_DIR
+	ls -l $BK_FILE
 ;;
 
-"cpOut")
+"rmAggrInp")
+	echo "removing outlier aggregation input files"
+	IN_DIR=$PROJECT_HOME/bin/beymani/input/ecom/aggr
+	rm $IN_DIR/*
+	ls -l $IN_DIR
+;;
+
+"loadAggrInp")
 	echo "copying outlier output files for aggregation"
 	IN_DIR=$PROJECT_HOME/bin/beymani/input/ecom/aggr/
 	BK_DIR=$PROJECT_HOME/bin/beymani/output/ecom/bkup

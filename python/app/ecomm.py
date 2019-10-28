@@ -107,4 +107,53 @@ if __name__ == "__main__":
 			mrec = ",".join(rec)
 			print mrec
 		#print count
+	
+	#generate abandoned shopping cart data		
+	elif op == "scAb":
+		interval = int(sys.argv[2])
+		scDistr = GaussianRejectSampler(10,2)
+		
+		(cTime, pTime) = pastTime(interval, sys.argv[3])
+		pTime = hourAlign(pTime)
+		sTime = pTime
+		sIntv = secInHour
+		while sTime < cTime:
+			quant = int(scDistr.sample())
+			print "scAbandon,scAbandon,%d,%d" %(sTime,quant)  
+			sTime += sIntv
+
+	#insert outliers in abandoned shopping cart data	
+	elif op == "olScAb":			
+		fileName = sys.argv[2]
+		olRate = int(sys.argv[3])
+		count = 0
+		for rec in fileRecGen(fileName, ","):
+			if isEventSampled(olRate):
+				quant = randint(15, 25)
+				count += 1
+				rec[3] = str(quant)
+			mrec = ",".join(rec)
+			print mrec
+		print count
+	
+	##make timestamp current	
+	elif op == "updTm":
+		fileName = sys.argv[2]
+		cTime = int(time.time())
+		cTime = hourAlign(cTime)
+	
+		recTime = 0
+		for rec in fileRecGen(fileName, ","):
+			tm = int(rec[2])
+			if tm > recTime:
+				recTime = tm
+				
+		tmDiff = cTime - recTime
+		for rec in fileRecGen(fileName, ","):
+			tm = int(rec[2])
+			tm += tmDiff
+			rec[2] = str(tm)
+			mrec = ",".join(rec)
+			print mrec
+			
 			

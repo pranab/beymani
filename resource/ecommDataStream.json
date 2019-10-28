@@ -5,19 +5,29 @@
 			"id" : "corp",
 			"type" : "root",
 			"parentId" : "none",
-			"parentType" : "none"
+			"parentType" : "none",
+			"singleton" : true
 		},
 		{
-			"id" : "corpSale",
+			"id" : "sale",
 			"type" : "sale",
-			"parentId" : "none",
-			"parentType" : "root"
+			"parentId" : "root",
+			"parentType" : "root",
+			"singleton" : true
 		},
 		{
 			"id" : "*",
 			"type" : "prodSale",
-			"parentId" : "none",
-			"parentType" : "sale"
+			"parentId" : "sale",
+			"parentType" : "sale",
+			"singleton" : false
+		},
+		{
+			"id" : "scAbandon",
+			"type" : "scAbandon",
+			"parentId" : "root",
+			"parentType" : "root",
+			"singleton" : true
 		}
 	]
 }
