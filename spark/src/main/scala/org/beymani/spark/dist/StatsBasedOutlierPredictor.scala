@@ -32,7 +32,7 @@ import org.chombo.spark.common.SeasonalUtility
 import org.beymani.predictor.EstimatedProbabilityBasedPredictor
 import org.beymani.predictor.EsimatedAttrtibuteProbabilityBasedPredictor
 import org.beymani.predictor.InterPercentileDifferenceBasedPredictor
-import org.apache.spark.Accumulator
+import org.apache.spark.util.LongAccumulator
 import org.chombo.spark.common.GeneralUtility
 import org.beymani.predictor.EstimatedMetaProbabilityBasedPredictor
 import org.beymani.predictor.EstimatedCumProbabilityBasedPredictor
@@ -175,10 +175,10 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val brPredictor = sparkCntxt.broadcast(predictor)
 	 
 	   //counters
-	   val lowIgnoredCounter = sparkCntxt.accumulator(0)
-	   val highIgnoredCounter = sparkCntxt.accumulator(0)
-	   val noIgnoredCounter = sparkCntxt.accumulator(0)
-	   val invalidScoreCounter = sparkCntxt.accumulator(0)
+	   val lowIgnoredCounter = new LongAccumulator()
+	   val highIgnoredCounter = new LongAccumulator()
+	   val noIgnoredCounter = new LongAccumulator()
+	   val invalidScoreCounter = new LongAccumulator()
 	   
 	   
 	   //predict for each field in each line whether it's an outlier
@@ -244,7 +244,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			   if (!predictor.isValid(keyStr))  {
 			     //invalid prediction because of missing model
 			     marker = "I"
-			     invalidScoreCounter += 1
+			     invalidScoreCounter.add(1)
 			   }
 			   
 			   marker = 
@@ -411,7 +411,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    */
    def applyPolarityToOutlier(items:Array[String], quantFldOrd:Int, label:String, outlierPolarity:String, key:String, 
        meanValues:java.util.Map[String,java.lang.Double], stdDevValues:java.util.Map[String,java.lang.Double], stdDevMult:Double,
-       lowIgnoredCounter:Accumulator[Int], highIgnoredCounter:Accumulator[Int], noIgnoredCounter:Accumulator[Int]) : String = {
+       lowIgnoredCounter:LongAccumulator, highIgnoredCounter:LongAccumulator, noIgnoredCounter:LongAccumulator) : String = {
 	   var newLabel = label
 	   val value = items(quantFldOrd).toDouble
 	   val mean = meanValues.get(key)
@@ -423,17 +423,17 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 		     if (outlierPolarity.equals("high")) {
 		       if (value < hiThreshold) {
 		         newLabel = "N"
-		         lowIgnoredCounter += 1
+		         lowIgnoredCounter.add(1)
 		       }
 		     } else if (outlierPolarity.equals("low")) {
 		       if (value > loThreshold) {
 		         newLabel = "N"
-		         highIgnoredCounter += 1
+		         highIgnoredCounter.add(1)
 		       }
 		     } else {
 		       if (value > loThreshold && value < hiThreshold) {
 		         newLabel = "N"
-		         noIgnoredCounter += 1
+		         noIgnoredCounter.add(1)
 		       }
 		       
 		     }
