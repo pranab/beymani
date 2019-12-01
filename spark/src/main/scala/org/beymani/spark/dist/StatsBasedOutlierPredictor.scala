@@ -338,10 +338,10 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   configParams.put("exp.const", expConst)
 	   
 	   val isHdfsFile = getBooleanParamOrElse(appConfig, "hdfs.file", false)
-	   configParams.put("hdfs.file", new java.lang.Boolean(isHdfsFile))
+	   configParams.put("hdfs.file", java.lang.Boolean.valueOf(isHdfsFile))
 	   
 	   val ignoreMissingModel = getBooleanParamOrElse(appConfig, "ignore.missingModel", true)
-	   configParams.put("ignore.missingModel", new java.lang.Boolean(ignoreMissingModel))
+	   configParams.put("ignore.missingModel", java.lang.Boolean.valueOf(ignoreMissingModel))
 	       
 	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
 	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
