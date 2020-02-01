@@ -35,8 +35,6 @@ import org.chombo.util.Utility;
  */
 public class ZscorePredictor  extends ModelBasedPredictor{
 	protected NumericalAttrStatsManager statsManager;
-	private String fieldDelim;
-	private boolean seasonal;
 	protected MessageQueue outQueue;
 	protected Cache cache;
 	

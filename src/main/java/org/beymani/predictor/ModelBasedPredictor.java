@@ -39,7 +39,11 @@ public abstract class ModelBasedPredictor implements Serializable {
 	protected int[] attrOrdinals;
 	protected double[] attrWeights;
 	protected boolean ignoreMissingStat;
+	protected String fieldDelim;
+	protected boolean seasonal;
+
 	private String aggregationStrategy;
+	
 
 	public ModelBasedPredictor() {
 		

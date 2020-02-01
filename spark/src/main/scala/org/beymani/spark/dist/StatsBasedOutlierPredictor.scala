@@ -36,6 +36,7 @@ import org.apache.spark.util.LongAccumulator
 import org.chombo.spark.common.GeneralUtility
 import org.beymani.predictor.EstimatedMetaProbabilityBasedPredictor
 import org.beymani.predictor.EstimatedCumProbabilityBasedPredictor
+import org.beymani.predictor.MahalanobisDistancePredictor
 import org.beymani.spark.common.OutlierUtility
 
 /**
@@ -52,6 +53,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    private val predStrategyInterPercentDiff = "interPercentileDifference";
    private val predStrategyEstMetaProb = "estimatedMetaProbablity";
    private val predStrategyEstCumProb = "estimatedCumProbablity";
+   private val predStrategyMahalanobisDistance = "mahalanobisDistance";
    
    /**
    * Outlier detection with various statistical techniques
@@ -74,7 +76,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val predictorStrategy = getMandatoryStringParam(appConfig, "predictor.strategy", "missing prediction strategy")
 	   val predictorStrategies = Array[String]("zscore", "robustZscore", "estimatedProbablity", 
 	       "estimatedAttributeProbablity", "extremeValueProbablity", "interPercentileDifference", "estimatedMetaProbablity",
-	       "estimatedCumProbablity")
+	       "estimatedCumProbablity",  "mahalanobisDistance")
 	   assertStringMember(predictorStrategy, predictorStrategies, "invalid prediction strategy " + predictorStrategy)
 
 	   val appAlgoConfig = appConfig.getConfig(predictorStrategy)
@@ -166,6 +168,11 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
        	    "id.fieldOrdinals", "attr.ordinals","distr.filePath", "hdfs.file", "schema.filePath", 
        	    "attr.weights", "seasonal.analysis", "field.delim.in", "score.threshold", "ignore.missingModel", 
        	    "attr.weightStrategy")
+       	  
+       	  case `predStrategyMahalanobisDistance` => new MahalanobisDistancePredictor(algoConfig, "id.fieldOrdinals", "attr.ordinals", 
+       	    "field.delim.in", "stats.filePath", "seasonal.analysis", "hdfs.file", "score.threshold",
+       	    "exp.const", "ignore.missingModel")
+
 	   }
 	   
 	   val ignoreMissingStat = getBooleanParamOrElse(appConfig, "ignore.missingStat", false)
@@ -397,6 +404,11 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	       configParams.put("distr.filePath", distrFilePath)
 	       configParams.put("schema.filePath", null)
 	     }
+	     case `predStrategyMahalanobisDistance` => {
+	       val statsFilePath = getMandatoryStringParam(appAlgoConfig, "stats.file.path", "missing stat file path")
+	       configParams.put("stats.filePath", statsFilePath)
+	     }
+
 	   }
 	   
 	   configParams
