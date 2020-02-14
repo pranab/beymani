@@ -60,8 +60,10 @@ object SpectralResiduePredictor extends JobConfiguration with GeneralUtility wit
 	   val expConst = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
 	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
 	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
+	   val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	
 	   val windowSize = getIntParamOrElse(appConfig, "window.size", 3)
-	   val movAvWindowSize = getIntParamOrElse(appConfig, "movav.window.size", 3)
+	   val movAvWindowSize = getIntParamOrElse(appConfig, "fft.ma.window.size", 5)
+	   val ifftMovAvWindowSize = getIntParamOrElse(appConfig, "ifft.ma.window.size", 3)
 	   
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
@@ -83,10 +85,12 @@ object SpectralResiduePredictor extends JobConfiguration with GeneralUtility wit
 	     (key, value)
 	   })	 
 	   
+	   //records with tag and score
 	   val allTaggedData = keyedData.groupByKey.flatMap(v => {
 	     val key = v._1
 	     val keyStr = key.toString
 	     val values = v._2.toList.sortBy(v => v.getLong(0))
+	     val size = values.length
 	   
 	     //window
 	     var windows = Map[Int, FastFourierTransformWindow]()
@@ -95,8 +99,8 @@ object SpectralResiduePredictor extends JobConfiguration with GeneralUtility wit
 	       windows += (i -> window)
 	     })
 	     
-	     //tagged records
-	     var scores = Map[Int, ArrayBuffer[Double]]()
+	     //all scores
+	     var allScores = Map[Int, ArrayBuffer[Double]]()
 	     values.foreach(v => {
 	       val line = v.getString(1)
 	       val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
@@ -105,19 +109,45 @@ object SpectralResiduePredictor extends JobConfiguration with GeneralUtility wit
 	         val window = windows.get(i).get
 	         window.add(quant)
 	         if (window.isProcessed()) {
-	           val amps = window.getAmp()
-	           val phases = window.getPhase()
+	           val ouScores = getOutlierScore(window, movAvWindowSize, ifftMovAvWindowSize)
+	           val attrScores = allScores.get(i).get
+	           attrScores ++=  ouScores
 	         }
 	       })
-	       
 	     })
 	     
-	     List()
+	     //agggregate attr scores
+	     values.zipWithIndex.map(r => {
+	       val rec = r._1
+	       val i = r._2
+	       val recScores = attrOrdsList.map(a => {
+	         val attrScores =  allScores.get(a).get
+	         MathUtils.expScale(expConst, attrScores(i));
+	       }).toArray
+	       val aggScore = MathUtils.weightedAverage(recScores, attrWeights)
+	       val marker = if (aggScore > scoreThreshold) "O"  else "N"
+	       val line = rec.getString(1)
+	       line + fieldDelimOut + BasicUtils.formatDouble(aggScore, precision) + fieldDelimOut + marker 
+	     })
 	   })
+	   
+	   if (debugOn) {
+       val records = allTaggedData.collect
+       records.slice(0, 100).foreach(r => println(r))
+     }
+	   
+	   if(saveOutput) {	   
+	     allTaggedData.saveAsTextFile(outputPath) 
+	   }	 
 	   
    }
    
-   def getOutlierScore(window:FastFourierTransformWindow, movAvWindowSize:Int): Array[Double] = {
+  /**
+ 	* @param window
+ 	* @param movAvWindowSize
+ 	* @return
+ 	*/
+  def getOutlierScore(window:FastFourierTransformWindow, movAvWindowSize:Int, ifftMovAvWindowSize:Int): Array[Double] = {
 	   val amps = window.getAmp()
 	   val phases = window.getPhase()
      val lamps = amps.map(v => Math.log(v))
@@ -128,7 +158,7 @@ object SpectralResiduePredictor extends JobConfiguration with GeneralUtility wit
      val ix = FastFourierTransform.ifft(f)
      val iAmp = FastFourierTransform.findAmp(ix)
      val iAmpNeighborAv = MathUtils.movingAverage(iAmp, movAvWindowSize, false)
-     val ouScore = MathUtils.subtractVector(iAmp, iAmpNeighborAv)
+     val ouScore = MathUtils.subtractVector(iAmp, ifftMovAvWindowSize)
      return ouScore
    }
   

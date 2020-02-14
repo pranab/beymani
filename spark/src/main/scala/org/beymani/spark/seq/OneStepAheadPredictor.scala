@@ -61,7 +61,7 @@ object OneStepAheadPredictor extends JobConfiguration with GeneralUtility with O
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
 	   val statDataDirPath = getMandatoryStringParam(appConfig, "stat.dataDirPath", 
 	       "missing stat file output directory path")
-	       val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	   
+	   val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	   
 	   val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
 	   val expConst = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
 	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
@@ -144,7 +144,7 @@ object OneStepAheadPredictor extends JobConfiguration with GeneralUtility with O
 	         val stdDev = stat.getStdDev()
 	         val range = tDistVal * stdDev * Math.sqrt(1.0 + 1.0 / count)
 	         var score = Math.abs(quantPrediction - quant) / range
-	         score = BasicUtils.expScale(expConst, score);
+	         score = BasicUtils.expScale(expConst, score)
 	         
 	         //if outlier replace actual with predicted in window
 	         if (score > scoreThreshold)
