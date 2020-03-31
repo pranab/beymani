@@ -91,7 +91,7 @@ object OneStepAheadPredictor extends JobConfiguration with GeneralUtility with O
 	  val data = sparkCntxt.textFile(inputPath)
 	   
 	  val keyedData = data.map(line => {
-	   val items = line.split(fieldDelimIn, -1)
+	   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 	   val key = Record(keyLen)
 	   populateFields(items, keyFieldOrdinals, key, "all")
 
@@ -185,12 +185,12 @@ object OneStepAheadPredictor extends JobConfiguration with GeneralUtility with O
 	 taggedData = processTaggedData(fieldDelimIn, thresholdNorm, taggedData)	 	
 
 	 if (debugOn) {
-         val records = taggedData.collect
-         records.slice(0, 100).foreach(r => println(r))
-     }
+    val records = taggedData.collect
+    records.slice(0, 100).foreach(r => println(r))
+   }
 	   
 	 if(saveOutput) {	   
-	     taggedData.saveAsTextFile(outputPath) 
+    taggedData.saveAsTextFile(outputPath) 
 	 }	 
 	     
    }
