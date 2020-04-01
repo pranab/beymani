@@ -16,11 +16,13 @@
  */
 
 package org.beymani.spark.common
+
 import org.apache.spark.rdd.RDD
 import scala.collection.JavaConverters._
 //import scala.collection.immutable.Map
 import org.chombo.util.BasicUtils
 import org.chombo.spark.common.Record
+import org.chombo.spark.common.GeneralUtility
 
 /**
  * @author pranab
@@ -118,5 +120,30 @@ trait OutlierUtility {
 	    case Some(thValMap) => thValMap.getOrElse(key, glThreshold)
 	    case None => glThreshold
 	  }
+	}
+	
+	/**
+	 * @param data
+	 * @param fieldDelimIn
+	 * @param keyLen
+	 * @param keyFieldOrdinals
+	 * @param seqFieldOrd
+	 * @param gen
+	 * @return
+	 */
+	def getKeyedValueWithSeq(data: RDD[String], fieldDelimIn:String, keyLen:Int, 
+	    keyFieldOrdinals: Option[Array[Int]], seqFieldOrd:Int, gen:GeneralUtility) : RDD[(Record, Record)] =  {
+	   data.map(line => {
+	     val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
+	     val key = Record(keyLen)
+	     gen.populateFields(items, keyFieldOrdinals, key, "all")
+
+	     val value = Record(2)
+	     val seq = items(seqFieldOrd).toLong
+	     value.addLong(seq)
+	     value.addString(line)
+	     (key, value)
+	   })	 
+	  
 	}
 }

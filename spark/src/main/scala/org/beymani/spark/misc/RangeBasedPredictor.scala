@@ -15,9 +15,7 @@
  * permissions and limitations under the License.
  */
 
-package org.beymani.spark.seq
-
-import scala.collection.mutable.ArrayBuffer
+package org.beymani.spark.misc
 
 import org.apache.spark.SparkContext
 import org.beymani.spark.common.OutlierUtility
@@ -25,23 +23,21 @@ import org.chombo.spark.common.GeneralUtility
 import org.chombo.spark.common.JobConfiguration
 import org.chombo.spark.common.Record
 import org.chombo.util.BasicUtils
-import org.hoidla.window.FastFourierTransformWindow
-import org.hoidla.analyze.FastFourierTransform
 import org.chombo.math.MathUtils
 
 /**
- * Anomaly detection in sequence data based on spectral residue
+ * Anomaly detection based on range i.e outlier if outside range
  * @author pranab
  *
  */
-object SpectralResiduePredictor extends JobConfiguration with GeneralUtility with OutlierUtility {
+object RangeBasedPredictor extends JobConfiguration with GeneralUtility with OutlierUtility {
   
    /**
    * @param args
    * @return
    */
    def main(args: Array[String]) {
-	   val appName = "spectralResiduePredictor"
+	   val appName = "rangeBasedPredictor"
 	   val Array(inputPath: String, outputPath: String, configFile: String) = getCommandLineArgs(args, 3)
 	   val config = createConfig(configFile)
 	   val sparkConf = createSparkConf(appName, config, false)
@@ -54,26 +50,35 @@ object SpectralResiduePredictor extends JobConfiguration with GeneralUtility wit
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val keyFieldOrdinals = toOptionalIntArray(getOptionalIntListParam(appConfig, "id.fieldOrdinals"))
 	   val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
-	   val attrOrdsList = attrOrds.toList
+	   val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
 	   val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
 	   val expConst = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
 	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
 	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
-	   val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	
-	   val windowSize = getIntParamOrElse(appConfig, "window.size", 3)
-	   val movAvWindowSize = getIntParamOrElse(appConfig, "fft.ma.window.size", 5)
-	   val ifftMovAvWindowSize = getIntParamOrElse(appConfig, "ifft.ma.window.size", 3)
-	   
+	   val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
+	   val rangeGlobal = getBooleanParamOrElse(appConfig, "range.global", true)
+	   val outlierOutsideRange = getBooleanParamOrElse(appConfig, "range.outlierOutside", true)
+	   val rangeFilePath = getConditionalMandatoryStringParam(!rangeGlobal, appConfig, "range.filePath", 
+	       "missing keywise range file path")
+	   val keyedRange = rangeGlobal match {
+	     case true => scala.collection.immutable.Map[String, (Double, Double, Double)]()
+	     case false => getKeyedRange(rangeFilePath, keyLen, attrOrds, fieldDelimIn)
+	   }
+	   val globalRange = toDoubleArray(getConditionalMandatoryDoubleListParam(rangeGlobal, appConfig, "range.global", 
+	       "missing global range file path"))
+	   val globalRangeMid = (globalRange(0) + globalRange(1)) / 2.0
+	   val revRangeFilePath = getConditionalMandatoryStringParam(!outlierOutsideRange && rangeGlobal, 
+	       appConfig, "range.filePath", "missing keywise range file path")
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 
-	   val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
 	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
 	   
-	   val keyedData = getKeyedValueWithSeq(data, fieldDelimIn, keyLen, keyFieldOrdinals, seqFieldOrd, this)
+	   //keyed data
+	   val keyedData =  getKeyedValueWithSeq(data, fieldDelimIn, keyLen, keyFieldOrdinals, seqFieldOrd, this)
 	   
 	   //records with tag and score
 	   val allTaggedData = keyedData.groupByKey.flatMap(v => {
@@ -81,45 +86,28 @@ object SpectralResiduePredictor extends JobConfiguration with GeneralUtility wit
 	     val keyStr = key.toString
 	     val values = v._2.toList.sortBy(v => v.getLong(0))
 	     val size = values.length
-	   
-	     //window
-	     var windows = Map[Int, FastFourierTransformWindow]()
-	     attrOrdsList.foreach(i => {
-	       val window = new FastFourierTransformWindow(windowSize)
-	       windows += (i -> window)
-	     })
 	     
-	     //all scores
-	     var allScores = Map[Int, ArrayBuffer[Double]]()
-	     values.foreach(v => {
+	     values.map(v => {
 	       val line = v.getString(1)
 	       val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
-	       attrOrdsList.foreach(i => {
-	         val quant = items(i).toDouble
-	         val window = windows.get(i).get
-	         window.add(quant)
-	         if (window.isProcessed()) {
-	           val ouScores = getOutlierScore(window, movAvWindowSize, ifftMovAvWindowSize)
-	           val attrScores = allScores.get(i).get
-	           attrScores ++=  ouScores
+	       val scores = attrOrds.map(ord => {
+	         val quant = items(ord).toDouble
+	         val range = rangeGlobal match {
+	           case true => (globalRange(0), globalRange(1), globalRangeMid)
+	           case false => {
+	             val extKey = keyStr + fieldDelimIn + ord
+	             keyedRange.get(extKey).get
+	           }
 	         }
+	         val mid = range._3 
+	         val delta = if (quant > mid) quant - range._2 else range._1 - quant
+	         MathUtils.logisticScale(expConst, delta)
 	       })
-	     })
-	     
-	     //agggregate attr scores
-	     values.zipWithIndex.map(r => {
-	       val rec = r._1
-	       val i = r._2
-	       val recScores = attrOrdsList.map(a => {
-	         val attrScores =  allScores.get(a).get
-	         MathUtils.expScale(expConst, attrScores(i));
-	       }).toArray
-	       val aggScore = MathUtils.weightedAverage(recScores, attrWeights)
+	       val aggScore = MathUtils.weightedAverage(scores, attrWeights)
 	       val marker = if (aggScore > scoreThreshold) "O"  else "N"
-	       val line = rec.getString(1)
 	       line + fieldDelimOut + BasicUtils.formatDouble(aggScore, precision) + fieldDelimOut + marker 
 	     })
-	   })
+	   })	
 	   
 	   if (debugOn) {
        val records = allTaggedData.collect
@@ -129,27 +117,37 @@ object SpectralResiduePredictor extends JobConfiguration with GeneralUtility wit
 	   if(saveOutput) {	   
 	     allTaggedData.saveAsTextFile(outputPath) 
 	   }	 
-	   
    }
-   
-  /**
- 	* @param window
- 	* @param movAvWindowSize
- 	* @return
- 	*/
-  def getOutlierScore(window:FastFourierTransformWindow, movAvWindowSize:Int, ifftMovAvWindowSize:Int): Array[Double] = {
-	   val amps = window.getAmp()
-	   val phases = window.getPhase()
-     val lamps = amps.map(v => Math.log(v))
-     val avLamps = MathUtils.movingAverage(lamps, movAvWindowSize, true) 
-     var res = MathUtils.subtractVector(lamps, avLamps)
-     res = res.map(v => Math.exp(v))
-     val f = FastFourierTransform.createComplex(res, phases)
-     val ix = FastFourierTransform.ifft(f)
-     val iAmp = FastFourierTransform.findAmp(ix)
-     val iAmpNeighborAv = MathUtils.movingAverage(iAmp, ifftMovAvWindowSize, false)
-     val ouScore = MathUtils.subtractVector(iAmp, iAmpNeighborAv)
-     return ouScore
+
+   /**
+	 * @param config
+	 * @param paramName
+	 * @param defValue
+	 * @param errorMsg
+	 * @return
+	 */
+   def getKeyedRange(rangeFilePath:String, keyLen:Int, attrOrds:Array[Int], fieldDelimIn:String) : 
+     scala.collection.immutable.Map[String, (Double, Double, Double)] =  {
+       val numAttr = attrOrds.length
+       val attrOrdsIndx = attrOrds.zipWithIndex
+       var keyedRange = scala.collection.immutable.Map[String, (Double, Double, Double)]()
+	     val fileLines = BasicUtils.getFileLines(rangeFilePath)
+	     fileLines.forEach(line => {
+	       val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
+	       val key = items.slice(0, keyLen).mkString(fieldDelimIn)
+	       attrOrdsIndx.foreach(v => {
+	         val ord = v._1
+	         val indx = v._2
+	         val extKey = key + fieldDelimIn + ord
+	         
+	         val rLo = items(keyLen + indx).toDouble
+	         val rHi = items(keyLen + indx + numAttr).toDouble
+	         val rMid = (rLo + rHi) / 2.0
+	         val rng = (rLo, rHi, rMid)
+	         keyedRange += (extKey -> rng)
+	       })
+	     })
+	     keyedRange
    }
   
 }
