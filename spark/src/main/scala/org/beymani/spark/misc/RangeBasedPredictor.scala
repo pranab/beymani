@@ -52,33 +52,45 @@ object RangeBasedPredictor extends JobConfiguration with GeneralUtility with Out
 	   val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
 	   val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
-	   val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
+	   //val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
 	   val expConst = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
 	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
 	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
 	   val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
+	   
 	   val rangeGlobal = getBooleanParamOrElse(appConfig, "range.global", true)
-	   val outlierOutsideRange = getBooleanParamOrElse(appConfig, "range.outlierOutside", true)
+	   //val outlierOutsideRange = getBooleanParamOrElse(appConfig, "range.outlierOutside", true)
 	   val rangeFilePath = getConditionalMandatoryStringParam(!rangeGlobal, appConfig, "range.filePath", 
 	       "missing keywise range file path")
 	   val keyedRange = rangeGlobal match {
 	     case true => scala.collection.immutable.Map[String, (Double, Double, Double)]()
 	     case false => getKeyedRange(rangeFilePath, keyLen, attrOrds, fieldDelimIn)
 	   }
-	   val globalRange = toDoubleArray(getConditionalMandatoryDoubleListParam(rangeGlobal, appConfig, "range.global", 
-	       "missing global range file path"))
-	   val globalRangeMid = (globalRange(0) + globalRange(1)) / 2.0
-	   val revRangeFilePath = getConditionalMandatoryStringParam(!outlierOutsideRange && rangeGlobal, 
-	       appConfig, "range.filePath", "missing keywise range file path")
+	   
+	   val globalRangeList = getConditionalMandatoryDoubleListParam(rangeGlobal, appConfig, "range.global", 
+	       "missing global range file path")
+      val (globalRange, globalRangeMid) = if (null != globalRangeList) {
+	     val globalRange = toDoubleArray(globalRangeList)
+	     val globalRangeMid = (globalRange(0) + globalRange(1)) / 2.0
+	     (globalRange, globalRangeMid)
+	   } else {
+	     val globalRange = Array[Double]()
+	     val globalRangeMid = 0.0
+	     (globalRange, globalRangeMid)
+	   }
+	   
+	   //val revRangeFilePath = getConditionalMandatoryStringParam(!outlierOutsideRange && rangeGlobal, 
+	   //    appConfig, "range.filePath", "missing keywise range file path")
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 
 	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
+	   //println("input " + data.getClass.toString())
 	   
 	   //keyed data
-	   val keyedData =  getKeyedValueWithSeq(data, fieldDelimIn, keyLen, keyFieldOrdinals, seqFieldOrd, this)
+	   val keyedData =  getKeyedValueWithSeq(data, fieldDelimIn, keyLen, keyFieldOrdinals, seqFieldOrd)
 	   
 	   //records with tag and score
 	   val allTaggedData = keyedData.groupByKey.flatMap(v => {

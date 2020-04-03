@@ -73,7 +73,7 @@ object SpectralResiduePredictor extends JobConfiguration with GeneralUtility wit
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
 	   
-	   val keyedData = getKeyedValueWithSeq(data, fieldDelimIn, keyLen, keyFieldOrdinals, seqFieldOrd, this)
+	   val keyedData = getKeyedValueWithSeq(data, fieldDelimIn, keyLen, keyFieldOrdinals, seqFieldOrd)
 	   
 	   //records with tag and score
 	   val allTaggedData = keyedData.groupByKey.flatMap(v => {

@@ -132,11 +132,21 @@ trait OutlierUtility {
 	 * @return
 	 */
 	def getKeyedValueWithSeq(data: RDD[String], fieldDelimIn:String, keyLen:Int, 
-	    keyFieldOrdinals: Option[Array[Int]], seqFieldOrd:Int, gen:GeneralUtility) : RDD[(Record, Record)] =  {
+	    keyFieldOrdinals: Option[Array[Int]], seqFieldOrd:Int) : RDD[(Record, Record)] =  {
 	   data.map(line => {
 	     val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 	     val key = Record(keyLen)
-	     gen.populateFields(items, keyFieldOrdinals, key, "all")
+	     //gen.populateFields(items, keyFieldOrdinals, key, "all")
+	     
+	     keyFieldOrdinals match {
+	      case Some(fieldOrds : Array[Int]) => {
+	    	  for (kf <- fieldOrds) {
+	    		  key.addString(items(kf))
+			    }
+	      }
+	      case None => key.add("all")
+	    }
+
 
 	     val value = Record(2)
 	     val seq = items(seqFieldOrd).toLong
