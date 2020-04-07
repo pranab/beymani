@@ -24,7 +24,43 @@ from util import *
 from mlutil import *
 from sampler import *
 
+personTypes = ["working", "homeMaker", "student"]
+locationTypes = ["residemce", "business", "school", "medicalFacility", "shoppingArea", "entertainmentArea"]
 
+class Person(object):
+	"""
+	Person location related 
+	"""
+		
+	def __init__(self, phoneNum, type):
+		self.phoneNum = phoneNum
+		self.type = type
+		
+	def setWorkLoc(self, workLoc):
+		self.workLoc = workLoc
+		
+	def setSchoolLoc(self, schoolLoc):
+		self.workLoc = workLoc
+		
+	def setCurLoc(self, curLoc, locType, arrivalTime):
+		self.curLoc = curLoc
+		locType.locType = locType
+		self.arrivalTime = arrivalTime
+		
+	def setNextMovement(self, nextMove):
+		self.nextMove = nextMove
+		
+class Movement(object):
+	"""
+	movement event
+	"""
+	def __init__(self, location, locType, depTime, speed):
+		self. location = location
+		self.locType = locType
+		self. depTime = depTime
+		self. speed = speed
+		
+		
 def loadConfig(configFile):
 	"""
 	load config file
@@ -33,6 +69,12 @@ def loadConfig(configFile):
 	defValues["population.num.hours"] = (15, None)
 	defValues["population.sampling.interval"] = (5, None)
 	defValues["population.size"] = (10000, None)
+	defValues["population.num.family"] = (1000, None)
+	defValues["population.family.size.mean"] = (2.5, None)
+	defValues["population.family.size.sd"] = (.5, None)
+	defValues["population.working.family.percentage"] = (70, None)
+	defValues["population.retired.family"] = (70, None)
+	defValues["population.retired.one.person.family.percentage"] = (30, None)
 	defValues["region.lat.min"] = (2.000, None)
 	defValues["region.lat.max"] = (2.000, None)
 	defValues["region.long.min"] = (2.000, None)
@@ -50,13 +92,99 @@ def loadConfig(configFile):
 	defValues["region.num.schools"] = (8, None)
 	defValues["region.num.colleges"] = (2, None)
 	defValues["region.quarantine.list.file"] = (None, None)
-	defValues["region.num.quarantine"] = (100, None)
+	defValues["region.num.locations"] = (100, None)
 	defValues["region.loc.size"] = (0.0002, None)
 	defValues["region.quarantine.loc.file"] = (None, None)
 	defValues["region.quarantine.num.violation"] = (5, None)
+	defValues["region.residence.list.file"] = (None, None)
+	defValues["region.work.list.file"] = (None, None)
+	defValues["region.school.list.file"] = (None, None)
+	defValues["region.medical.facility.list.file"] = (None, None)
+	defValues["region.shopping.area.list.file"] = (None, None)
+	defValues["region.entertainment.area.list.file"] = (None, None)
 
 	config = Configuration(configFile, defValues)
 	return config
+
+def genLocations(config, minLat, minLong, maxLat, maxLong):
+	"""
+	generte locations
+	"""
+	numLoc = config.getIntConfig("region.num.locations")[0]
+	locSize = config.getFloatConfig("region.loc.size")[0]
+	for i in range(numLoc):
+		loc = genLatLong(minLat, minLong, maxLat, maxLong) 
+		sampleFloatFromBase(locSize, 0.3 * locSize)
+		latMax = loc[0] + sampleFloatFromBase(locSize, 0.3 * locSize)
+		longgMax = loc[1] + sampleFloatFromBase(locSize, 0.3 * locSize)
+		print ("{:.6f},{:.6f},{:.6f},{:.6f}".format(loc[0], loc[1], latMax, longgMax))
+
+def loadLocations(filePath):
+	"""
+	load location list
+	"""
+	locations = list()
+	for rec in fileRecGen(filePath, ","):
+		rec = (float(rec[1]), float(rec[2]), float(rec[3]), float(rec[4]))
+		locations.append(rec)
+	return locations
+
+def createFamilies(config, residenceLocList, numWorkLoc, numSchoolLoc, personTypes):
+	"""
+	creates families
+	"""
+	families = dict()
+	famSizeMn = config.getFloatConfig("population.family.size.mean")[0]
+	famSizeSd = config.getFloatConfig("population.family.size.sd")[0]
+	famSzDistr = GaussianRejectSampler(famSizeMn,famSizeSd)
+	numFamily = config.getFloatConfig("population.num.family")[0]
+	workingFamPercentage = config.getIntConfig("population.working.family.percentage")[0]
+	retOnePersonFamPercentage = config.getIntConfig("population.retired.one.person.family.percentage")[0]
+	for res in residenceLocList:
+		memebers = list()
+		if isEventSampled(workingFamPercentage):		
+			famSize = int(famSzDistr.sample())
+			famSize = 1 if famSize == 0 else famSize
+			pType = "working"
+			phNum = genPhoneNum("408")
+			workLoc = sampleUniform(0, numWorkLoc - 1)
+			person = Person(phNum, pType, workLoc)
+			memebers.append(person)
+			for j in range(famSize):
+				person = createPerson()
+				if pType == "working":
+					person.setWorkLoc(sampleUniform(0, numWorkLoc - 1))
+				elif pType == "student":
+					schoolLoc = sampleUniform(0, numSchoolLoc - 1)
+					person.setSchoolLoc(sampleUniform(0, numSchoolLoc - 1))
+				memebers.append(person)
+		else:
+			memebers.append(createRetPerson())
+			if not isEventSampled(retOnePersonFamPercentage):
+				memebers.append(createRetPerson())
+		families[res] = members
+		
+	return families
+			
+def createPerson():
+	"""
+	create person
+	"""
+	pType = selectRandomFromList(personTypes)
+	phNum = genPhoneNum("408")
+	person = Person(phNum, pType)
+	return person
+
+
+def createRetPerson():
+	"""
+	create retired person
+	"""
+	pType = "retired"
+	phNum = genPhoneNum("408")
+	person = Person(phNum, pType)
+	return person
+			
 
 if __name__ == "__main__":
 	op = sys.argv[1]
@@ -75,12 +203,35 @@ if __name__ == "__main__":
 	maxLat = config.getFloatConfig("region.lat.max")[0]
 	#print ("{:.6f},{:.6f}, {:.6f},{:.6f}".format(minLat, minLong, maxLat, maxLong))
 	
-	if op == "normal":
-		pass
-	elif op == "lockdown":
+	if op == "genMovement":
+		residenceLocList = loadLocations(config.getStringConfig("region.residence.list.file")[0])
+		workLocList = loadLocations(config.getStringConfig("region.work.list.file")[0])
+		schoolLocList = loadLocations(config.getStringConfig("region.school.list.file")[0])
+		medicalFacilityLocList = loadLocations(config.getStringConfig("region.medical.facility.list.file")[0])
+		shoppingAreaLocList = loadLocations(config.getStringConfig("region.shopping.area.list.file")[0])
+		entertainmentAreaLocList = loadLocations(config.getStringConfig("region.entertainment.area.list.file")[0])
+		
+		families = createFamilies(config, residenceLocList, len(workLocList), len(schoolLocList), personTypes)
+		
+		pastTm = hourOfDayAlign(pastTm, 8)
+		sampTm = pastTm
+		while sampTm < curTm:
+			for (resLoc, members) in families.items():
+				for person in members:
+					if person.type == "working":
+						pass
+					elif person.type == "working":
+						pass
+				
+
+		
+		
+	elif op == "genMovementLockdown":
 		pass
 	elif op == "genLoc":
-		numQu = config.getIntConfig("region.num.quarantine")[0]
+		genLocations(config, minLat, minLong, maxLat, maxLong)	
+	elif op == "genQuaLoc":
+		numQu = config.getIntConfig("region.num.locations")[0]
 		locSize = config.getFloatConfig("region.loc.size")[0]
 		inGroup = False
 		grSize = 0
@@ -174,6 +325,8 @@ if __name__ == "__main__":
 					violations.pop(phNum)
 					
 			print(",".join(rec))
+	else:
+		print("invalid command")
 					
 		
 
