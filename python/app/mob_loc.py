@@ -25,16 +25,29 @@ from mlutil import *
 from sampler import *
 
 personTypes = ["working", "homeMaker", "student"]
-locationTypes = ["residemce", "business", "school", "medicalFacility", "shoppingArea", "entertainmentArea"]
+locationTypes = ["residemce", "business", "school", "medicalFacility", "shoppingArea", "entertainmentArea", "largeEvent"]
+numActivitiesDistr = NonParamRejectSampler(0, 1, 50, 35, 10, 5)
+destinationDistr = CategoricalRejectSampler(("medicalFacility", 10), ("shoppingArea", 80), ("entertainmentArea", 30), ("largeEvent", 10))
+tripTypeDistr = CategoricalRejectSampler(("multPurpose", 70), ("singlePurpose", 30))
+depTimeDistr = NonParamRejectSampler(10, 1, 50, 40, 30, 5, 5, 20, 30, 40, 50, 60, 50, 20, 10)
+transportSpeedDistr = CategoricalRejectSampler(("15", 20), ("30", 50), ("50", 70))
+timeSpentDistr = dict()
+timeSpentDistr["business"] = GaussianRejectSampler(540, 10)
+timeSpentDistr["school"] = GaussianRejectSampler(360, 50)
+timeSpentDistr["medicalFacility"] = GaussianRejectSampler(120, 30)
+timeSpentDistr["shoppingArea"] = GaussianRejectSampler(30, 5)
+timeSpentDistr["entertainmentArea"] = GaussianRejectSampler(90, 20)
+timeSpentDistr["largeEvent"] = GaussianRejectSampler(180, 20)
 
 class Person(object):
 	"""
 	Person location related 
 	"""
-		
+
 	def __init__(self, phoneNum, type):
 		self.phoneNum = phoneNum
 		self.type = type
+		self.movements = list()
 		
 	def setWorkLoc(self, workLoc):
 		self.workLoc = workLoc
@@ -48,17 +61,21 @@ class Person(object):
 		self.arrivalTime = arrivalTime
 		
 	def setNextMovement(self, nextMove):
-		self.nextMove = nextMove
+		self.movements.append(nextMove)
+	
+	def setTripType(self, tripType):
+		self.tripType = tripType
 		
 class Movement(object):
 	"""
 	movement event
 	"""
-	def __init__(self, location, locType, depTime, speed):
+	def __init__(self, location, locType, depTime, speed, timeSpent):
 		self. location = location
 		self.locType = locType
 		self. depTime = depTime
 		self. speed = speed
+		this.timeSpent = timeSpent
 		
 		
 def loadConfig(configFile):
@@ -102,6 +119,7 @@ def loadConfig(configFile):
 	defValues["region.medical.facility.list.file"] = (None, None)
 	defValues["region.shopping.area.list.file"] = (None, None)
 	defValues["region.entertainment.area.list.file"] = (None, None)
+	defValues["region.large.event.area.list.file"] = (None, None)
 
 	config = Configuration(configFile, defValues)
 	return config
@@ -184,7 +202,48 @@ def createRetPerson():
 	phNum = genPhoneNum("408")
 	person = Person(phNum, pType)
 	return person
-			
+
+def initPosition(families, allLocations, initTime):
+	"""
+	initializes position of a person and all trips for a day
+	"""			
+	for (resLoc, members) in families.items():
+		for person in members:
+			person.setCurLoc(resLoc, "residence", initTime)
+			numActivity = numActivitiesDistr.sample()
+			workingOrStudent = person.type == "working" or person.type == "student"
+			if workingOrStudent and numActivity == 0:
+				numActivity = 1
+			tripType = tripTypeDistr.sample()
+			person.setTripType(tripType)
+			if tripType == "singlePurpose" and numActivity > 1:
+				numActivity = 1
+			firstTrip = true
+			speed = float(transportSpeedDistr.sample())
+			for i in range(numActivity):
+				if person.type == "working":
+					depTime = initTime + sampleUniform(0, secPerHour)
+					timeSpent = int(timeSpentDistr["business"].sample())
+					mv = Movement(person.workLoc, "business", depTime, speed, timeSpent)
+				elif person.type == "student":
+					depTime = initTime + sampleUniform(0, 2 * secPerHour)
+					timeSpent = int(timeSpentDistr["school"].sample())
+					mv = Movement(person.schoolLoc, "school", depTime, speed, timeSpent)
+				else:
+					destination = destinationDistr.sample()
+					loc = selectRandomFromList(allLocations[destination])
+					if firstTrip:
+						depTime = intTime + (depTimeDistr.sample() - 8) * secPerHour
+					else:
+						depTime = -1
+					timeSpent = int(timeSpentDistr[destination].sample())
+					mv = Movement(person.loc, destination, depTime, speed, timeSpent)	
+				person.setNextMovement(mv)
+				
+				if firstTrip:
+					firstTrip = false
+					
+		
 
 if __name__ == "__main__":
 	op = sys.argv[1]
@@ -203,6 +262,8 @@ if __name__ == "__main__":
 	maxLat = config.getFloatConfig("region.lat.max")[0]
 	#print ("{:.6f},{:.6f}, {:.6f},{:.6f}".format(minLat, minLong, maxLat, maxLong))
 	
+	
+	allLocations = dict()
 	if op == "genMovement":
 		residenceLocList = loadLocations(config.getStringConfig("region.residence.list.file")[0])
 		workLocList = loadLocations(config.getStringConfig("region.work.list.file")[0])
@@ -210,19 +271,25 @@ if __name__ == "__main__":
 		medicalFacilityLocList = loadLocations(config.getStringConfig("region.medical.facility.list.file")[0])
 		shoppingAreaLocList = loadLocations(config.getStringConfig("region.shopping.area.list.file")[0])
 		entertainmentAreaLocList = loadLocations(config.getStringConfig("region.entertainment.area.list.file")[0])
+		largeEventAreaLocList = loadLocations(config.getStringConfig("region.large.event.area.list.file")[0])
+		
+		allLocations["residemce"] = residenceLocList
+		allLocations["business"] = workLocList
+		allLocations["school"] = schoolLocList
+		allLocations["medicalFacility"] = medicalFacilityLocList
+		allLocations["shoppingArea"] = shoppingAreaLocList
+		allLocations["entertainmentArea"] = entertainmentAreaLocList
+		allLocations["largeEvent"] = largeEventAreaLocList
 		
 		families = createFamilies(config, residenceLocList, len(workLocList), len(schoolLocList), personTypes)
 		
 		pastTm = hourOfDayAlign(pastTm, 8)
 		sampTm = pastTm
 		while sampTm < curTm:
-			for (resLoc, members) in families.items():
-				for person in members:
-					if person.type == "working":
-						pass
-					elif person.type == "working":
-						pass
-				
+			if sampTm == pastTm:
+				initPosition(families, allLocations, pastTm)
+			else:
+				pass
 
 		
 		
