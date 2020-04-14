@@ -30,14 +30,14 @@ import org.chombo.math.MathUtils
  * @author pranab
  *
  */
-object RangeBasedPredictor extends JobConfiguration with GeneralUtility with OutlierUtility {
+object OutRangeBasedPredictor extends JobConfiguration with GeneralUtility with OutlierUtility {
   
    /**
    * @param args
    * @return
    */
    def main(args: Array[String]) {
-	   val appName = "rangeBasedPredictor"
+	   val appName = "outRangeBasedPredictor"
 	   val Array(inputPath: String, outputPath: String, configFile: String) = getCommandLineArgs(args, 3)
 	   val config = createConfig(configFile)
 	   val sparkConf = createSparkConf(appName, config, false)

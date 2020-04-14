@@ -25,9 +25,11 @@ from mlutil import *
 from sampler import *
 
 personTypes = ["working", "homeMaker", "student"]
-locationTypes = ["residence", "business", "school", "medicalFacility", "shoppingArea", "entertainmentArea", "largeEvent"]
+locationTypes = ["residence", "business", "school", "medicalFacility", "shoppingArea", "entertainmentArea",\
+"largeEvent", "openSpace", "quarantined"]
 numActivitiesDistr = NonParamRejectSampler(0, 1, 50, 35, 10, 5)
-destinationDistr = CategoricalRejectSampler(("medicalFacility", 10), ("shoppingArea", 80), ("entertainmentArea", 30), ("largeEvent", 10))
+destinationDistr = CategoricalRejectSampler(("medicalFacility", 15), ("shoppingArea", 80), ("entertainmentArea", 30),\
+("largeEvent", 10), ("openSpace", 20), ("quarantined", 10))
 tripTypeDistr = CategoricalRejectSampler(("multPurpose", 70), ("singlePurpose", 30))
 depTimeDistr = NonParamRejectSampler(10, 1, 50, 40, 30, 5, 5, 20, 30, 40, 50, 60, 50, 20, 10)
 depTimeDistr.sampleAsFloat()
@@ -39,12 +41,14 @@ timeSpentDistr["medicalFacility"] = GaussianRejectSampler(120, 30)
 timeSpentDistr["shoppingArea"] = GaussianRejectSampler(30, 5)
 timeSpentDistr["entertainmentArea"] = GaussianRejectSampler(90, 20)
 timeSpentDistr["largeEvent"] = GaussianRejectSampler(180, 20)
+timeSpentDistr["openSpace"] = GaussianRejectSampler(100, 25)
+timeSpentDistr["quarantined"] = GaussianRejectSampler(20, 4)
 
 class Person(object):
 	"""
 	Person location related 
 	"""
-
+	quarantinedVisitCount = 0
 	def __init__(self, phoneNum, type):
 		self.phoneNum = phoneNum
 		self.type = type
@@ -83,6 +87,61 @@ class Person(object):
 	
 	def setTripType(self, tripType):
 		self.tripType = tripType
+		
+	def initLoc(self, resLoc, allLocations, initTime, numActivitiesDistr, tripTypeDistr, transportSpeedDistr,\
+	timeSpentDistr, destinationDistr):
+		self.setCurLoc(resLoc, "residence", initTime)
+		resList = allLocations["residence"]
+		self.setHomeLoc(resList.index(resLoc))
+			
+		numActivity = numActivitiesDistr.sample()
+		workingOrStudent = self.type == "working" or self.type == "student"
+		if workingOrStudent and numActivity == 0:
+			numActivity = 1
+		tripType = tripTypeDistr.sample()
+		self.setTripType(tripType)
+		if tripType == "singlePurpose" and numActivity > 1:
+			numActivity = 1
+		firstTrip = True
+		speed = float(transportSpeedDistr.sample())
+		loc = None
+		for i in range(numActivity):
+			mv = None
+			if self.type == "working" and firstTrip:
+				depTime = initTime + sampleUniform(0, secInHour)
+				timeSpent = int(timeSpentDistr["business"].sample() * secInMinute)
+				loc =self.workLoc
+				mv = Movement(loc, "business", depTime, speed, timeSpent)
+				
+			if self.type == "student" and firstTrip:
+				depTime = initTime + sampleUniform(0, 2 * secInHour)
+				timeSpent = int(timeSpentDistr["school"].sample() * secInMinute)
+				loc = self.schoolLoc
+				mv = Movement(loc, "school", depTime, speed, timeSpent)
+				
+			if mv is None:
+				destination = destinationDistr.sample()
+				if destination == "quarantined":
+					Person.quarantinedVisitCount += 1
+				locList = allLocations[destination]
+				loc = sampleUniform(0, len(locList) - 1)
+				if firstTrip:
+					depTime = initTime + (depTimeDistr.sample() - 8) * secInHour
+				else:
+					depTime = -1
+				timeSpent = int(timeSpentDistr[destination].sample() * secInMinute)
+				mv = Movement(loc, destination, depTime, speed, timeSpent)	
+					
+			self.setNextMovement(mv)
+				
+			if firstTrip:
+				firstTrip = False
+					
+		#back home
+		if (numActivity > 0):
+			mv = Movement(self.homeLoc, "residence", -1, speed, -1)	
+			self.setNextMovement(mv)
+	
 		
 	def getLoc(self, curTm, sampIntv, allLocations):
 		loc = None
@@ -162,6 +221,7 @@ def loadConfig(configFile):
 	load config file
 	"""
 	defValues = {}
+	defValues["common.verbose"] = (False, None)
 	defValues["population.num.hours"] = (15, None)
 	defValues["population.sampling.interval"] = (5, None)
 	defValues["population.size"] = (10000, None)
@@ -194,6 +254,7 @@ def loadConfig(configFile):
 	defValues["region.shopping.area.list.file"] = (None, None)
 	defValues["region.entertainment.area.list.file"] = (None, None)
 	defValues["region.large.event.area.list.file"] = (None, None)
+	defValues["region.open.space.list.file"] = (None, None)
 
 	config = Configuration(configFile, defValues)
 	return config
@@ -211,13 +272,14 @@ def genLocations(config, minLat, minLong, maxLat, maxLong):
 		longgMax = loc[1] + sampleFloatFromBase(locSize, 0.3 * locSize)
 		print ("{:.6f},{:.6f},{:.6f},{:.6f}".format(loc[0], loc[1], latMax, longgMax))
 
-def loadLocations(filePath):
+def loadLocations(filePath, skipFirst=False):
 	"""
 	load location list
 	"""
 	locations = list()
+	offset = 1 if skipFirst else 0
 	for rec in fileRecGen(filePath, ","):
-		rec = (float(rec[0]), float(rec[1]), float(rec[2]), float(rec[3]))
+		rec = (float(rec[offset]), float(rec[offset+1]), float(rec[offset+2]), float(rec[offset+3]))
 		locations.append(rec)
 	return locations
 
@@ -280,61 +342,6 @@ def createRetPerson():
 	person = Person(phNum, pType)
 	return person
 
-def initPosition(families, allLocations, initTime):
-	"""
-	initializes position of a person and all trips for a day
-	"""			
-	for (resLoc, members) in families.items():
-		for person in members:
-			person.setCurLoc(resLoc, "residence", initTime)
-			resList = allLocations["residence"]
-			person.setHomeLoc(resList.index(resLoc))
-			
-			numActivity = numActivitiesDistr.sample()
-			workingOrStudent = person.type == "working" or person.type == "student"
-			if workingOrStudent and numActivity == 0:
-				numActivity = 1
-			tripType = tripTypeDistr.sample()
-			person.setTripType(tripType)
-			if tripType == "singlePurpose" and numActivity > 1:
-				numActivity = 1
-			firstTrip = True
-			speed = float(transportSpeedDistr.sample())
-			loc = None
-			for i in range(numActivity):
-				mv = None
-				if person.type == "working" and firstTrip:
-					depTime = initTime + sampleUniform(0, secInHour)
-					timeSpent = int(timeSpentDistr["business"].sample() * secInMinute)
-					loc = person.workLoc
-					mv = Movement(loc, "business", depTime, speed, timeSpent)
-				
-				if person.type == "student" and firstTrip:
-					depTime = initTime + sampleUniform(0, 2 * secInHour)
-					timeSpent = int(timeSpentDistr["school"].sample() * secInMinute)
-					loc = person.schoolLoc
-					mv = Movement(loc, "school", depTime, speed, timeSpent)
-				
-				if mv is None:
-					destination = destinationDistr.sample()
-					locList = allLocations[destination]
-					loc = sampleUniform(0, len(locList) - 1)
-					if firstTrip:
-						depTime = initTime + (depTimeDistr.sample() - 8) * secInHour
-					else:
-						depTime = -1
-					timeSpent = int(timeSpentDistr[destination].sample() * secInMinute)
-					mv = Movement(loc, destination, depTime, speed, timeSpent)	
-					
-				person.setNextMovement(mv)
-				
-				if firstTrip:
-					firstTrip = False
-					
-			#back home
-			if (numActivity > 0):
-				mv = Movement(person.homeLoc, "residence", -1, speed, -1)	
-				person.setNextMovement(mv)
 				
 if __name__ == "__main__":
 	op = sys.argv[1]
@@ -352,7 +359,7 @@ if __name__ == "__main__":
 	minLat = config.getFloatConfig("region.lat.min")[0]
 	maxLat = config.getFloatConfig("region.lat.max")[0]
 	#print ("{:.6f},{:.6f}, {:.6f},{:.6f}".format(minLat, minLong, maxLat, maxLong))
-	
+	verbise = config.getBooleanConfig("common.verbose")[0]
 	
 	allLocations = dict()
 	if op == "genMovement":
@@ -363,6 +370,8 @@ if __name__ == "__main__":
 		shoppingAreaLocList = loadLocations(config.getStringConfig("region.shopping.area.list.file")[0])
 		entertainmentAreaLocList = loadLocations(config.getStringConfig("region.entertainment.area.list.file")[0])
 		largeEventAreaLocList = loadLocations(config.getStringConfig("region.large.event.area.list.file")[0])
+		openSpaceLocList = loadLocations(config.getStringConfig("region.open.space.list.file")[0])
+		quarantinedLocList = loadLocations(config.getStringConfig("region.quarantine.list.file")[0], True)
 		
 		allLocations = dict()
 		allLocations["residence"] = residenceLocList
@@ -372,6 +381,8 @@ if __name__ == "__main__":
 		allLocations["shoppingArea"] = shoppingAreaLocList
 		allLocations["entertainmentArea"] = entertainmentAreaLocList
 		allLocations["largeEvent"] = largeEventAreaLocList
+		allLocations["openSpace"] = openSpaceLocList
+		allLocations["quarantined"] = quarantinedLocList
 		
 		families = createFamilies(config, residenceLocList, len(workLocList), len(schoolLocList), personTypes)
 		
@@ -380,14 +391,21 @@ if __name__ == "__main__":
 		curTm = pastTm + 16 * secInHour
 		while sampTm < curTm:
 			if sampTm == pastTm:
-				initPosition(families, allLocations, pastTm)
+				#initialize position and trips
+				for (resLoc, members) in families.items():
+					for person in members:
+						person.initLoc(resLoc, allLocations, pastTm, numActivitiesDistr, tripTypeDistr,\
+						transportSpeedDistr, timeSpentDistr, destinationDistr)
+
 			else:
+				#time history of movements
 				for (resLoc, members) in families.items():
 					for person in members:
 						loc = person.getLoc(sampTm, smpIntvSec, allLocations)
 						print ("{},{},{:.6f},{:.6f}".format(person.phoneNum,sampTm, loc[0], loc[1]))
 			sampTm += smpIntvSec
-		
+		if verbise:
+			print("quanrantine visit count {}".format(Person.quarantinedVisitCount))
 		
 	elif op == "genMovementLockdown":
 		pass
