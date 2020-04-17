@@ -62,9 +62,9 @@ object InRangeBasedPredictor extends JobConfiguration with GeneralUtility with O
 	   val rangeGlobal = getBooleanParamOrElse(appConfig, "range.global", true)
 	   val globalRangeFilePath = getConditionalMandatoryStringParam(rangeGlobal, appConfig, "range.globalFilePath", 
 	       "missing keywise range file path")
-	   val keyedGlobalRange = rangeGlobal match {
-	     case true => scala.collection.immutable.Map[String, (Double, Double, Double)]()
-	     case false => getKeyedRange(globalRangeFilePath, keyLen, attrOrds, fieldDelimIn)
+	   val globalRange = rangeGlobal match {
+	     case true => getGlobalRange(globalRangeFilePath, attrOrds, fieldDelimIn)
+	     case false => Array.ofDim[Double](1, 1)
 	   }
 
 	   val localRangeFilePath = getConditionalMandatoryStringParam(!rangeGlobal, appConfig, "range.LocalFilePath", 
@@ -77,10 +77,44 @@ object InRangeBasedPredictor extends JobConfiguration with GeneralUtility with O
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 
+	   //global range outlier score
+     val glRangeOutlierScore = (globalRanges:Array[Array[Double]],items: Array[String], attrOrds:Array[Int], 
+     attrWeights: Array[Double], expConst:Double) => {
+       val attrOrdsIndx = attrOrds.zipWithIndex
+       val allScores = globalRanges.map(range => {
+         val scores = attrOrdsIndx.map(v => {
+  	       val ord = v._1
+  	       val indx = v._2
+  	       val quant = items(ord).toDouble
+  	       val offset = 3 * indx 
+  	       val rLo = range(offset)
+  	       val rHi = range(offset+1)
+  	       val rMid = range(offset+2)
+  	       val delta = if (quant > rMid) quant - rHi else rLo - quant
+  	       1.0 - MathUtils.logisticScale(expConst, delta)
+         })
+         MathUtils.weightedAverage(scores, attrWeights)
+       }).toArray
+       allScores.max
+     }   
+	   
+     //local range outlier score
+     val loRangeOutlierScore = (keyedLocalRange:scala.collection.immutable.Map[String, (Double, Double, Double)],
+     items: Array[String], attrOrds:Array[Int], keyStr:String, attrWeights: Array[Double], expConst:Double, 
+     fieldDelimIn:String) => {
+       val scores = attrOrds.map(ord => {
+	       val quant = items(ord).toDouble
+	       val extKey = keyStr + fieldDelimIn + ord
+	       val range = keyedLocalRange.get(extKey).get
+	       val mid = range._3 
+	       val delta = if (quant > mid) quant - range._2 else range._1 - quant
+	       1.0 - MathUtils.logisticScale(expConst, delta)
+       })
+       MathUtils.weightedAverage(scores, attrWeights)
+     }
 	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
-	   //println("input " + data.getClass.toString())
 	   
 	   //keyed data
 	   val keyedData =  getKeyedValueWithSeq(data, fieldDelimIn, keyLen, keyFieldOrdinals, seqFieldOrd)
@@ -91,14 +125,14 @@ object InRangeBasedPredictor extends JobConfiguration with GeneralUtility with O
 	     val keyStr = key.toString
 	     val values = v._2.toList.sortBy(v => v.getLong(0))
 	     val size = values.length
+	     println("before outlier score")
 	     
 	     values.map(v => {
 	       val line = v.getString(1)
 	       val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 	       val score = rangeGlobal match {
-	           case true => getGlobalRangeOutlierScore(keyedGlobalRange, items, attrOrds, attrWeights, expConst)
-  	         case false => getLocalRangeOutlierScore(keyedLocalRange,items, attrOrds, keyStr, attrWeights, 
-  	               expConst, fieldDelimIn)
+	           case true => glRangeOutlierScore(globalRange, items, attrOrds, attrWeights, expConst)
+  	         case false => loRangeOutlierScore(keyedLocalRange, items, attrOrds, keyStr, attrWeights, expConst, fieldDelimIn)
 	       }
 	       val marker = if (score > scoreThreshold) "O"  else "N"
 	       line + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + marker 
@@ -114,6 +148,40 @@ object InRangeBasedPredictor extends JobConfiguration with GeneralUtility with O
 	     allTaggedData.saveAsTextFile(outputPath) 
 	   }	 
    }
+   
+   
+      /**
+	 * @param config
+	 * @param paramName
+	 * @param defValue
+	 * @param errorMsg
+	 * @return
+	 */
+   def getGlobalRange(rangeFilePath:String, attrOrds:Array[Int], fieldDelimIn:String) : 
+     Array[Array[Double]] =  {
+       val numAttr = attrOrds.length
+       val attrOrdsIndx = attrOrds.zipWithIndex
+ 	     val fileLines = toStringArray(BasicUtils.getFileLines(rangeFilePath))
+       val size = fileLines.length
+       //val rangeMaitrx = Array.ofDim[Double](size, 3 * numAttr)
+	     fileLines.map(line => {
+	       val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
+	       val attrRanges =  attrOrdsIndx.flatMap(v => {
+	         val ord = v._1
+	         val indx = v._2
+	         val rLo = items(indx).toDouble
+	         val rHi = items(indx + numAttr).toDouble
+	         val rMid = (rLo + rHi) / 2.0
+	         val attrRanges = Array.ofDim[Double](3)
+	         attrRanges(0) = rLo
+	         attrRanges(1) = rHi
+	         attrRanges(2) = rMid          
+	         attrRanges
+         })
+         attrRanges
+	     })
+   }
+
 
    /**
 	 * @param config
@@ -146,53 +214,4 @@ object InRangeBasedPredictor extends JobConfiguration with GeneralUtility with O
 	     keyedRange
    }
  
-   /**
-	 * @param keyedGlobalRange
-	 * @param items
-	 * @param attrOrds
-	 * @param attrWeights
-	 * @param expConst
-	 * @return
-	 */
-   def getGlobalRangeOutlierScore(keyedGlobalRange:scala.collection.immutable.Map[String, (Double, Double, Double)],
-        items: Array[String], attrOrds:Array[Int], attrWeights: Array[Double], expConst:Double): Double = {
-     //all locations many to many
-     val allScores = keyedGlobalRange.map(v => {
-       val range = v._2
-       val scores = attrOrds.map(ord => {
-	       val quant = items(ord).toDouble
-	       val mid = range._3 
-	       val delta = if (quant > mid) quant - range._2 else range._1 - quant
-	       1.0 - MathUtils.logisticScale(expConst, delta)
-       })
-       MathUtils.weightedAverage(scores, attrWeights)
-     }).toArray
-     allScores.max
-   }
- 
-   /**
-	 * @param keyedLocalRange
-	 * @param items
-	 * @param attrOrds
-	 * @param keyStr
-	 * @param attrWeights
-	 * @param expConst
-	 * @param fieldDelimIn
-	 * @return
-	 */
-   def getLocalRangeOutlierScore(keyedLocalRange:scala.collection.immutable.Map[String, (Double, Double, Double)],
-        items: Array[String], attrOrds:Array[Int], keyStr:String, attrWeights: Array[Double], expConst:Double, 
-        fieldDelimIn:String): Double = {
-        //individual locations one to one
-        val scores = attrOrds.map(ord => {
-	       val quant = items(ord).toDouble
-	       val extKey = keyStr + fieldDelimIn + ord
-	       val range = keyedLocalRange.get(extKey).get
-	       val mid = range._3 
-	       val delta = if (quant > mid) quant - range._2 else range._1 - quant
-	       1.0 - MathUtils.logisticScale(expConst, delta)
-       })
-       MathUtils.weightedAverage(scores, attrWeights)
-   }
-   
 }
