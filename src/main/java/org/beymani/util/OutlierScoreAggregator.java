@@ -45,6 +45,16 @@ public class OutlierScoreAggregator implements Serializable{
 	}
 
 	/**
+	 * @param size
+	 * @param weights
+	 */
+	public OutlierScoreAggregator(int size) {
+		this.size = size;
+		scores = new double[size];
+		available = new boolean[size];
+	}
+
+	/**
 	 * 
 	 */
 	public void initialize() {
@@ -126,4 +136,54 @@ public class OutlierScoreAggregator implements Serializable{
 		return median;
 	}
 	
+	/**
+	 * @return
+	 */
+	public double getMax() {
+		BasicUtils.assertCondition(indx == size, "all scores not collected indx " + indx + " size " + size);
+		double maxScore = Double.MIN_VALUE;
+		for (int i = 0, j = 0; i < size; ++i){
+			if (available[i]) {
+				if (scores[i] > maxScore) {
+					maxScore = scores[i];
+				}
+			}
+		}
+		return maxScore;
+	}
+	
+	public double getMin() {
+		BasicUtils.assertCondition(indx == size, "all scores not collected indx " + indx + " size " + size);
+		double minScore = Double.MAX_VALUE;
+		for (int i = 0, j = 0; i < size; ++i){
+			if (available[i]) {
+				if (scores[i] < minScore) {
+					minScore = scores[i];
+				}
+			}
+		}
+		return minScore;
+	}
+
+	/**
+	 * @return
+	 */
+	public static double getAggregateScore(OutlierScoreAggregator scoreAggregator, String aggregationStrategy) {
+		double aggrScore = 0;
+		if (aggregationStrategy.equals("average")) {
+			aggrScore = scoreAggregator.getAverage();
+		} else if (aggregationStrategy.equals("weightedAverage")) {
+			aggrScore = scoreAggregator.getWeightedAverage();
+		} else if (aggregationStrategy.equals("median")) {
+			aggrScore = scoreAggregator.getMedian();
+		} else if (aggregationStrategy.equals("max")) {
+			aggrScore = scoreAggregator.getMax();
+		} else if (aggregationStrategy.equals("min")) {
+			aggrScore = scoreAggregator.getMin();
+		} else {
+			BasicUtils.assertFail("invalid outlier score aggregation strategy " + aggregationStrategy);
+		}
+		return aggrScore;
+	}
+
 }

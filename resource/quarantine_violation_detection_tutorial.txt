@@ -1,0 +1,79 @@
+This tutorial is for detecting quarantine violation based mobile location anomaly. Violation
+could be because of quarantined people miving out of quarantined location or non quarantined people
+visiting quarantined locations
+ 
+
+Environment
+===========
+Make sure you have ../lib  directory with all the python files wrt where mob_loc.py is. 
+Please refer to resource/spark_dependency.txt for building the jar for Spark.
+All the configuration data generation python script are mob_loc.properties. Make sure all the 
+directories for data as in epid.sh are created
+
+Generate data for out of range violation
+========================================
+Phone numbers and quarantim=ne location
+python3 mob_loc.py genQuaLoc mob_loc.properties > qualist.txt
+
+quarantined people movement location data
+python3 mob_loc.py quaLoc mob_loc.properties > qualoc.txt
+
+insert outliers in movement location data (quarantined person moving out of quarantined location)
+python3 mob_loc.py quaLocOutlier mob_loc.properties > qualocou.txt
+
+Copy data
+=========
+quarantine location
+./epid.sh cpQuaLocData qualist.txt outr
+
+quarantined people movement location data
+./epid.sh cpLocData qualoc.txt outr
+
+Spark job going out range outlier
+=================================
+./epid.sh olPredOu
+
+Generate data for out of range violation
+========================================
+all locations data
+python3 mob_loc.py genLoc mob_loc.properties  > res_loc.txt
+python3 mob_loc.py genLoc mob_loc.properties  > work_loc.txt
+python3 mob_loc.py genLoc mob_loc.properties  > school_loc.txt
+python3 mob_loc.py genLoc mob_loc.properties  > med_loc.txt
+python3 mob_loc.py genLoc mob_loc.properties  > shop_loc.txt
+python3 mob_loc.py genLoc mob_loc.properties  > ent_loc.txt
+python3 mob_loc.py genLoc mob_loc.properties  > event_loc.txt 
+python3 mob_loc.py genLoc mob_loc.properties > open_loc.txt
+
+Here are the region.num.locations and region.loc.size. You have to set them before generating location
+for each location type
+residence 			200	.0002
+work				10	.0005
+school				3	.0020
+medical				3	.0004
+shoppinh area		5	.0020
+entertainment area	5	.0010
+large event area	2	.0008
+open space			2	.0024
+
+quarantined locations
+python3 mob_loc.py uniqQuaLoc  mob_loc.properties  > uniq_qualist.txt
+
+people movement location data
+python3 mob_loc.py genMovement mob_loc.properties  > move_loc.txt
+
+Copy data
+=========
+quarantine location
+./epid.sh cpQuaLocData uniq_qualist.txt inr
+
+quarantined people movement location data
+./epid.sh cpLocData move_loc.txt inr
+
+Spark job for in range outlier
+==============================
+./epid.sh olPredIn
+
+
+
+

@@ -24,6 +24,7 @@ import org.chombo.spark.common.JobConfiguration
 import org.chombo.spark.common.Record
 import org.chombo.util.BasicUtils
 import org.chombo.math.MathUtils
+import org.beymani.util.OutlierScoreAggregator
 
 /**
  * Anomaly detection based on range i.e outlier if outside range
@@ -54,12 +55,12 @@ object OutRangeBasedPredictor extends JobConfiguration with GeneralUtility with 
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
 	   //val thresholdNorm = getOptionalDoubleParam(appConfig, "score.thresholdNorm")
 	   val expConst = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
+	   val aggregationStrategy = getStringParamOrElse(appConfig, "attr.weightStrategy", "weightedAverage")
 	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
 	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
 	   val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
 	   
 	   val rangeGlobal = getBooleanParamOrElse(appConfig, "range.global", true)
-	   //val outlierOutsideRange = getBooleanParamOrElse(appConfig, "range.outlierOutside", true)
 	   val rangeFilePath = getConditionalMandatoryStringParam(!rangeGlobal, appConfig, "range.filePath", 
 	       "missing keywise range file path")
 	   val keyedRange = rangeGlobal match {
@@ -79,8 +80,6 @@ object OutRangeBasedPredictor extends JobConfiguration with GeneralUtility with 
 	     (globalRange, globalRangeMid)
 	   }
 	   
-	   //val revRangeFilePath = getConditionalMandatoryStringParam(!outlierOutsideRange && rangeGlobal, 
-	   //    appConfig, "range.filePath", "missing keywise range file path")
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 
@@ -115,7 +114,9 @@ object OutRangeBasedPredictor extends JobConfiguration with GeneralUtility with 
 	         val delta = if (quant > mid) quant - range._2 else range._1 - quant
 	         MathUtils.logisticScale(expConst, delta)
 	       })
-	       val aggScore = MathUtils.weightedAverage(scores, attrWeights)
+	       val aggregator = new  OutlierScoreAggregator(attrWeights.length, attrWeights)
+	       scores.foreach(s => aggregator.addScore(s))
+	       val aggScore = OutlierScoreAggregator.getAggregateScore(aggregator, aggregationStrategy)
 	       val marker = if (aggScore > scoreThreshold) "O"  else "N"
 	       line + fieldDelimOut + BasicUtils.formatDouble(aggScore, precision) + fieldDelimOut + marker 
 	     })

@@ -116,6 +116,10 @@ public abstract class ModelBasedPredictor implements Serializable {
 			aggrScore = scoreAggregator.getWeightedAverage();
 		} else if (aggregationStrategy.equals("median")) {
 			aggrScore = scoreAggregator.getMedian();
+		} else if (aggregationStrategy.equals("max")) {
+			aggrScore = scoreAggregator.getMax();
+		} else if (aggregationStrategy.equals("min")) {
+			aggrScore = scoreAggregator.getMin();
 		} else {
 			BasicUtils.assertFail("invalid outlier score aggregation strategy " + aggregationStrategy);
 		}

@@ -24,6 +24,7 @@ import org.chombo.spark.common.JobConfiguration
 import org.chombo.spark.common.Record
 import org.chombo.util.BasicUtils
 import org.chombo.math.MathUtils
+import org.beymani.util.OutlierScoreAggregator
 
 /**
  * Anomaly detection based on range i.e outlier if inside range
@@ -55,6 +56,7 @@ object InRangeBasedPredictor extends JobConfiguration with GeneralUtility with O
 	   val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
 	   val expConst = getDoubleParamOrElse(appConfig, "exp.const", 1.0)	 
+	   val aggregationStrategy = getStringParamOrElse(appConfig, "attr.weightStrategy", "weightedAverage")
 	   val attWeightList = getMandatoryDoubleListParam(appConfig, "attr.weights", "missing attribute weights")
 	   val attrWeights = BasicUtils.fromListToDoubleArray(attWeightList)
 	   val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
@@ -93,7 +95,9 @@ object InRangeBasedPredictor extends JobConfiguration with GeneralUtility with O
   	       val delta = if (quant > rMid) quant - rHi else rLo - quant
   	       1.0 - MathUtils.logisticScale(expConst, delta)
          })
-         MathUtils.weightedAverage(scores, attrWeights)
+	       val aggregator = new  OutlierScoreAggregator(attrWeights.length, attrWeights)
+	       scores.foreach(s => aggregator.addScore(s))
+	       OutlierScoreAggregator.getAggregateScore(aggregator, aggregationStrategy)
        }).toArray
        allScores.max
      }   
@@ -110,7 +114,9 @@ object InRangeBasedPredictor extends JobConfiguration with GeneralUtility with O
 	       val delta = if (quant > mid) quant - range._2 else range._1 - quant
 	       1.0 - MathUtils.logisticScale(expConst, delta)
        })
-       MathUtils.weightedAverage(scores, attrWeights)
+	     val aggregator = new  OutlierScoreAggregator(attrWeights.length, attrWeights)
+	     scores.foreach(s => aggregator.addScore(s))
+	     OutlierScoreAggregator.getAggregateScore(aggregator, aggregationStrategy)
      }
 	   
 	   //input

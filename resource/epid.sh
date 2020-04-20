@@ -3,7 +3,7 @@
 PROJECT_HOME=/Users/pranab/Projects
 CHOMBO_JAR_NAME=$PROJECT_HOME/bin/chombo/uber-chombo-spark-1.0.jar
 BEYMANI_JAR_NAME=$PROJECT_HOME/bin/beymani/uber-beymani-spark-1.0.jar
-MASTER=spark://akash:7077
+MASTER=spark://akash.local:7077
 
 case "$1" in
 
@@ -23,7 +23,7 @@ case "$1" in
 "olPredOu")
 	echo "running OutRangeBasedPredictor Spark job"
 	CLASS_NAME=org.beymani.spark.misc.OutRangeBasedPredictor
-	INPUT=file:///Users/pranab/Projects/bin/beymani/input/outr/*
+	INPUT=file:///Users/pranab/Projects/bin/beymani/input/epid/outr/*
 	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/epid/outr
 	rm -rf ./output/epid/outr
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
