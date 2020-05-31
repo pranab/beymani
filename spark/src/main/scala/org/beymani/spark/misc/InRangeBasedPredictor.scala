@@ -31,8 +31,6 @@ import org.beymani.util.OutlierScoreAggregator
  * @author pranab
  *
  */
-
-
 object InRangeBasedPredictor extends JobConfiguration with GeneralUtility with OutlierUtility {
   
    /**
