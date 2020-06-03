@@ -63,7 +63,8 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	   val windowSize = getIntParamOrElse(appConfig, "window.size", 50)
 	   val statType = getStringParamOrElse(appConfig, "stat.type", "CVM")
 	   val statCritValue = getMandatoryDoubleParam(appConfig, "stat.critValue", "missing stat critical value")
-	   val seqCheckPoint = getOptionalIntParam(appConfig, "seq.checkPoint")
+	   val seqChPtFilePath = getOptionalStringParam(appConfig, "seq.chPtFilePath")
+	   val seqChPtOutFilePath = getMandatoryStringParam(appConfig, "seq.chPtOutFilePath", "missing check point output file path")
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 	   
@@ -71,12 +72,16 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	   var data = sparkCntxt.textFile(inputPath)
 	   
 	   //filter out anything earlier than checkpoint
-	   data = seqCheckPoint match {
-	     case Some(seChPt) => {
+	   data = seqChPtFilePath match {
+	     case Some(chPtFilePath) => {
+	       val seqChPoints = BasicUtils.getKeyedLongValues(chPtFilePath, keyLen, keyLen, fieldDelimIn)
 	       data.filter(line => {
 	         val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
-	         val seq = items(seqFieldOrd).toInt
-	         seq >= seChPt
+	         val key = Record(keyLen)
+	         populateFields(items, keyFieldOrdinals, key, "all")
+	         val chPt = seqChPoints.get(key.toString())
+	         val seq = items(seqFieldOrd).toLong
+	         seq >= chPt
 	       })
 	     }
 	     case None => data
@@ -93,11 +98,13 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	     val values = v._2.toList.sortBy(v => v.getLong(0))
 	     val size = values.length
 	     
+	     //all quant attributes
 	     attrOrds.flatMap(a => {
 	       val window = createWindow(statType, windowSize)
 	       val chPoints = ArrayBuffer[Long]()
 	       val seqValues = ArrayBuffer[Long]()
 	       
+	       //all values
 	       for (i <- 0 to (size - 1)) {
 	         val v = values(i)
 	         val line = v.getString(1)
@@ -115,17 +122,30 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	         }
 	       }
 	       
-	       chPoints.map(c => keyStr + fieldDelimOut + a + fieldDelimOut + c)
+	       val taggedValues = chPoints.map(c => {
+	         val tagedValue = Record(2)
+	         tagedValue.addInt(1)
+	         tagedValue.addString(keyStr + fieldDelimOut + a + fieldDelimOut + c)
+	         tagedValue
+	       })
+	       val tagedValue = Record(2)
+	       tagedValue.addInt(2)
+	       tagedValue.addString(keyStr + fieldDelimOut + seqValues(size - 1 - windowSize/2))
+	       taggedValues :+ tagedValue
 	     })
-	   })
+	   }).cache
+	   
+	   val seqChPoint = chPtData.filter(v => v.getInt(0) == 2).map(v => v.getString(1)).cache
+	   val chngPoint = chPtData.filter(v => v.getInt(0) == 1).map(v => v.getString(1))
 	   
 	   if (debugOn) {
-         val records = chPtData.collect
+         val records = chngPoint.collect
          records.slice(0, 20).foreach(r => println(r))
      }
 	   
 	   if(saveOutput) {	   
-	     chPtData.saveAsTextFile(outputPath) 
+	     chngPoint.saveAsTextFile(outputPath) 
+	     seqChPoint.saveAsTextFile(seqChPtOutFilePath) 
 	   }	 
 	   
 	   
