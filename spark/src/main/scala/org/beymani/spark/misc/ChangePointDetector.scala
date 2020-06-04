@@ -99,10 +99,12 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	     val size = values.length
 	     
 	     //all quant attributes
-	     attrOrds.flatMap(a => {
+	     val seqValues = ArrayBuffer[Long]()
+	     var seqValuesSet = false
+	     val checkPoints = attrOrds.flatMap(a => {
+	       //change points for this quant field
 	       val window = createWindow(statType, windowSize)
 	       val chPoints = ArrayBuffer[Long]()
-	       val seqValues = ArrayBuffer[Long]()
 	       
 	       //all values
 	       for (i <- 0 to (size - 1)) {
@@ -110,8 +112,10 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	         val line = v.getString(1)
 	         val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 	         val quant = items(a).toDouble
-	         val seq = items(seqFieldOrd).toLong
-	         seqValues += seq
+	         if (!seqValuesSet) {
+	           val seq = items(seqFieldOrd).toLong
+	           seqValues += seq
+	         }
 	         window.add(quant)
 	         if (window.isProcessed()) {
 	           val stat = window.getStat()
@@ -121,18 +125,20 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	           }
 	         }
 	       }
+	       seqValuesSet = true
 	       
-	       val taggedValues = chPoints.map(c => {
+	       chPoints.map(c => {
 	         val tagedValue = Record(2)
 	         tagedValue.addInt(1)
 	         tagedValue.addString(keyStr + fieldDelimOut + a + fieldDelimOut + c)
 	         tagedValue
 	       })
-	       val tagedValue = Record(2)
-	       tagedValue.addInt(2)
-	       tagedValue.addString(keyStr + fieldDelimOut + seqValues(size - 1 - windowSize/2))
-	       taggedValues :+ tagedValue
 	     })
+	     //sequence checkpoint
+	     val seqChPt = Record(2)
+	     seqChPt.addInt(2)
+	     seqChPt.addString(keyStr + fieldDelimOut + seqValues(size - 1 - windowSize/2))
+	     checkPoints :+ seqChPt
 	   }).cache
 	   
 	   val seqChPoint = chPtData.filter(v => v.getInt(0) == 2).map(v => v.getString(1)).cache
