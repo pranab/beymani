@@ -86,8 +86,6 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	     }
 	     case None => data
 	   }
-
-	   
 	   //keyed data
 	   val keyedData =  getKeyedValueWithSeq(data, fieldDelimIn, keyLen, keyFieldOrdinals, seqFieldOrd)
 
@@ -102,8 +100,15 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	     val seqValues = ArrayBuffer[Long]()
 	     var seqValuesSet = false
 	     val checkPoints = attrOrds.flatMap(a => {
+	       if (debugOn)
+	         println("quannt attr " + a)
 	       //change points for this quant field
-	       val window = createWindow(statType, windowSize)
+	       val window =   statType match {
+	         case "KS" => new KolmogorovSminovStatWindow(windowSize)
+	         case "CVM" => new CramerVonMisesStatWindow(windowSize)
+	         case "AD" => new AndersonDarlingStatWindow(windowSize)
+	       }
+
 	       val chPoints = ArrayBuffer[Long]()
 	       
 	       //all values
@@ -154,19 +159,6 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	     seqChPoint.saveAsTextFile(seqChPtOutFilePath) 
 	   }	 
 	   
-	   
    }
 
-   /**
-	 * @param statType
-	 * @param windowSize
-	 * @return window
-	 */
-   def createWindow(statType:String, windowSize:Int) : SizeBoundStatWindow = {
-     statType match {
-	     case "KS" => new KolmogorovSminovStatWindow(windowSize)
-	     case "CVM" => new CramerVonMisesStatWindow(windowSize)
-	     case "AD" => new AndersonDarlingStatWindow(windowSize)
-	   }
-   }
 }
