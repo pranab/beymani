@@ -95,6 +95,8 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	     val keyStr = key.toString
 	     val values = v._2.toList.sortBy(v => v.getLong(0))
 	     val size = values.length
+	     if (debugOn)
+	       println(keyStr + "size " + size);
 	     
 	     //all quant attributes
 	     val seqValues = ArrayBuffer[Long]()
@@ -124,9 +126,16 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	         window.add(quant)
 	         if (window.isProcessed()) {
 	           val stat = window.getStat()
+	           if (debugOn) {
+	             val wc = i - windowSize/2
+	             println("stat " + BasicUtils.formatDouble(stat, 3) + " window center at " + wc)
+	           }
 	           if (stat >= statCritValue) {
 	             val seqAtCp = seqValues(i - windowSize/2)
 	             chPoints += seqAtCp
+	             if (debugOn) {
+	               println("found chagepoint at " + seqAtCp)
+	             }
 	           }
 	         }
 	       }
@@ -161,4 +170,5 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	   
    }
 
+   
 }

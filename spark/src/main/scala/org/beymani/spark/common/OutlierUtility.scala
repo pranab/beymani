@@ -131,6 +131,8 @@ trait OutlierUtility {
 	 * @param gen
 	 * @return
 	 */
+	/*
+	 * moved to GeneralUtility
 	def getKeyedValueWithSeq(data: RDD[String], fieldDelimIn:String, keyLen:Int, 
 	    keyFieldOrdinals: Option[Array[Int]], seqFieldOrd:Int) : RDD[(Record, Record)] =  {
 	   data.map(line => {
@@ -156,4 +158,6 @@ trait OutlierUtility {
 	   })	 
 	  
 	}
+	* 
+	*/
 }
