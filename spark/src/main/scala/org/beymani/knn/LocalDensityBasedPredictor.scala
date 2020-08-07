@@ -24,6 +24,7 @@ import org.chombo.spark.common.GeneralUtility
 import org.chombo.spark.common.JobConfiguration
 import org.chombo.spark.common.Record
 import scala.collection.mutable.ArrayBuffer
+import org.beymani.spark.common.OutlierUtility
 import org.chombo.util.BasicUtils
 
 /**
@@ -31,7 +32,7 @@ import org.chombo.util.BasicUtils
 * @param args
 * @return
 */
-object LocalDensityBasedPredictor extends JobConfiguration with GeneralUtility {
+object LocalDensityBasedPredictor extends JobConfiguration with GeneralUtility with OutlierUtility  {
   
    /**
     * @param args
@@ -54,6 +55,16 @@ object LocalDensityBasedPredictor extends JobConfiguration with GeneralUtility {
 	   val distFilePath = getMandatoryStringParam(appConfig, "dist.file.path","missing distance file path")
 	   val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
 	   val neighborCount = getIntParamOrElse(appConfig, "nearest.neighbor.count", 3)
+	   val glScoreThreshold = getOptionalDoubleParam(appConfig, "score.threshold")
+	   val keyBasedScoreThreshold = glScoreThreshold match {
+	     case Some(th) => None
+	     case None => {
+	       val statsPath = getMandatoryStringParam(appConfig, "stats.file.path", "missing stat file path")
+	       val statFldOrd = getMandatoryIntParam(appConfig, "stats.field.ordinal","missing stats field ordinal")
+	       val scoreThresholdMap = BasicUtils.getKeyedValues(statsPath, keyLen, statFldOrd)
+	       Some(scoreThresholdMap)
+	     }
+	   }
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3);
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
@@ -170,13 +181,14 @@ object LocalDensityBasedPredictor extends JobConfiguration with GeneralUtility {
 	   }
 	   
 	   //find lof
-	   val x = lrd.union(flatNeighbors(kNeighbors)).groupByKey.flatMap(r => {
+	   val taggedRecs = lrd.union(flatNeighbors(kNeighbors)).groupByKey.flatMap(r => {
 	     //populate soure and each neighbor with lrd
 	     val values = r._2.toArray
 	     val lrdArr = values.filter(v => v.size == 1)
 	     BasicUtils.assertCondition(lrdArr.length == 1, "record containing lrd should have size 1")
 	     val lrd = lrdArr(0).getDouble(0)
 	     val nValues = values.filter(v => v.size == 2).map(v => {
+	       //put seq of neighborhood center in key
 	       v.addDouble(1, lrd)
 	       val k = Record(keyLen + 1, r._1, 0, keyLen)
 	       k.addLong(v.getLong(0))
@@ -184,7 +196,31 @@ object LocalDensityBasedPredictor extends JobConfiguration with GeneralUtility {
 	       (k, v)
 	     })
 	     nValues
+	   }).groupByKey.map(r => {
+	     //calculate olf
+	     val ncSeq = r._1.getLong(keyLen)
+	     val values = r._2.toArray
+	     val nLrds = values.filter(r => r.getLong(0) != ncSeq).map(r => r.getDouble(1))
+	     val cLrdRec = values.find(r => r.getLong(0) == ncSeq)
+	     val cLrd = cLrdRec match {
+	       case Some(c) => c.getDouble(1)
+	       case None => throw new IllegalStateException("")
+	     }
+	     val olf = (nLrds.sum / nLrds.length) / cLrd 
+	     val keyStr = r._1.toString(0, keyLen, fieldDelimOut)
+	     val label = getOutlierLabel(keyStr, olf, "high", glScoreThreshold, keyBasedScoreThreshold, false)
+	     r._1.toString(fieldDelimOut) + fieldDelimOut + BasicUtils.formatDouble(olf, precision) + 
+	       fieldDelimOut + label
 	   })
+	   
+	   if (debugOn) {
+         val records = taggedRecs.collect
+         records.slice(0, 20).foreach(r => println(r))
+     }
+	   
+	   if(saveOutput) {	   
+	     taggedRecs.saveAsTextFile(outputPath) 
+	   }	 
 	   
    } 
 }

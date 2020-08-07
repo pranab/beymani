@@ -121,43 +121,46 @@ trait OutlierUtility {
 	    case None => glThreshold
 	  }
 	}
-	
+	 
 	/**
-	 * @param data
-	 * @param fieldDelimIn
-	 * @param keyLen
-	 * @param keyFieldOrdinals
-	 * @param seqFieldOrd
-	 * @param gen
+	 * @param key
+	 * @param value
+	 * @param polarity
+	 * @param glScoreThreshold
+	 * @param keyBaseScoreThreshold
+	 * @param errOnMissingThreshold
 	 * @return
 	 */
-	/*
-	 * moved to GeneralUtility
-	def getKeyedValueWithSeq(data: RDD[String], fieldDelimIn:String, keyLen:Int, 
-	    keyFieldOrdinals: Option[Array[Int]], seqFieldOrd:Int) : RDD[(Record, Record)] =  {
-	   data.map(line => {
-	     val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
-	     val key = Record(keyLen)
-	     //gen.populateFields(items, keyFieldOrdinals, key, "all")
-	     
-	     keyFieldOrdinals match {
-	      case Some(fieldOrds : Array[Int]) => {
-	    	  for (kf <- fieldOrds) {
-	    		  key.addString(items(kf))
-			    }
+	def getOutlierLabel(key:String, value:Double, polarity:String, glScoreThreshold: Option[Double], 
+	    keyBasedScoreThreshold: Option[java.util.Map[String, java.lang.Double]], errOnMissingThreshold:Boolean) : String = {
+	  var scoreTh = 0.0
+	  var missingTh = false
+	  glScoreThreshold match {
+	    case Some(th) => scoreTh = th
+	    case None => {
+	      keyBasedScoreThreshold match {
+	        case Some(kbTh) => scoreTh = kbTh.get(key)
+	        case None => {
+	          if (errOnMissingThreshold) 
+	            throw new IllegalStateException("missing key specific threshold")
+	          else
+	            missingTh = true
+	        }
 	      }
-	      case None => key.add("all")
 	    }
-
-
-	     val value = Record(2)
-	     val seq = items(seqFieldOrd).toLong
-	     value.addLong(seq)
-	     value.addString(line)
-	     (key, value)
-	   })	 
+	  }
 	  
+	  val isOutlier = polarity match {
+	    case "low" => value < scoreTh
+	    case "high" => value > scoreTh
+	    case "both" => value < scoreTh || value > scoreTh
+	  }
+	  
+	 val label = 
+	   if (missingTh) "A"
+	   else if (isOutlier) "O" 
+	   else  "N"
+	 label
 	}
-	* 
-	*/
+	
 }
