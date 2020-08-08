@@ -52,8 +52,8 @@ object LocalDensityBasedPredictor extends JobConfiguration with GeneralUtility w
 	   val keyFieldOrdinals = toOptionalIntArray(getOptionalIntListParam(appConfig, "id.fieldOrdinals"))
 	   val seqFieldOrdinal = getMandatoryIntParam(appConfig, "seq.field.ordinal","missing sequence field ordinal") 
 	   val attrOrds = BasicUtils.fromListToIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
-	   val distFilePath = getMandatoryStringParam(appConfig, "dist.file.path","missing distance file path")
-	   val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
+	   val fullFilePath = getOptionalStringParam(appConfig, "full.filePath")
+	   val keyLen = getMandatoryIntParam(appConfig, "key.field.length","missing key field length") 
 	   val neighborCount = getIntParamOrElse(appConfig, "nearest.neighbor.count", 3)
 	   val glScoreThreshold = getOptionalDoubleParam(appConfig, "score.threshold")
 	   val keyBasedScoreThreshold = glScoreThreshold match {
@@ -70,7 +70,7 @@ object LocalDensityBasedPredictor extends JobConfiguration with GeneralUtility w
 	   val saveOutput = appConfig.getBoolean("save.output")
 
 	   //distance input
-	   val data = sparkCntxt.textFile(distFilePath)
+	   val data = sparkCntxt.textFile(inputPath)
 	   
 	   //nearest k neighbors
 	   val pairDistance = data.flatMap(line => {
@@ -211,15 +211,41 @@ object LocalDensityBasedPredictor extends JobConfiguration with GeneralUtility w
 	     val label = getOutlierLabel(keyStr, olf, "high", glScoreThreshold, keyBasedScoreThreshold, false)
 	     r._1.toString(fieldDelimOut) + fieldDelimOut + BasicUtils.formatDouble(olf, precision) + 
 	       fieldDelimOut + label
-	   })
+	       
+	     val k = Record(r._1)
+	     val v = Record(2)
+	     v.addDouble(olf)
+	     v.addString(label)
+	     (k, v)
+	   }).cache
 	   
+	   //use full records
+	   val fullRecs = fullFilePath match {
+	     case Some(path) => {
+	       val data = sparkCntxt.textFile(path)
+	       val keyedRecs =  getKeyedValue(data, fieldDelimIn, keyLen, keyFieldOrdinals)
+	       keyedRecs.union(taggedRecs).reduceByKey((r1, r2) => {
+	         if (r1.size == 2) {
+	           val v = Record(3, r1, 1)
+	           v.addString(0, r2.getString(0))
+	         } else {
+	           val v = Record(3, r2, 1)
+	           v.addString(0, r1.getString(0))
+	         }
+	       })
+	     } 
+	     case None => {
+	       taggedRecs
+	     }
+	   }
+	   val taggedFullRecs = fullRecs.map(r => r._1.toString(fieldDelimOut) + fieldDelimOut + r._2.toString(fieldDelimOut))
 	   if (debugOn) {
-         val records = taggedRecs.collect
+         val records = taggedFullRecs.collect
          records.slice(0, 20).foreach(r => println(r))
      }
 	   
 	   if(saveOutput) {	   
-	     taggedRecs.saveAsTextFile(outputPath) 
+	     taggedFullRecs.saveAsTextFile(outputPath) 
 	   }	 
 	   
    } 
