@@ -126,15 +126,13 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	         window.add(quant)
 	         if (window.isProcessed()) {
 	           val stat = window.getStat()
-	           if (debugOn) {
-	             val wc = i - windowSize/2
-	             println("stat " + BasicUtils.formatDouble(stat, 3) + " window center at " + wc)
-	           }
 	           if (stat >= statCritValue) {
 	             val seqAtCp = seqValues(i - windowSize/2)
 	             chPoints += seqAtCp
 	             if (debugOn) {
-	               println("found chagepoint at " + seqAtCp)
+	               val wc = i - windowSize/2
+	               println("found chagepoint for ID " + keyStr +  " at timestamp " + seqAtCp + " at index " + wc + 
+	                   " stat " + BasicUtils.formatDouble(stat, 3))
 	             }
 	           }
 	         }
@@ -148,13 +146,15 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	         tagedValue
 	       })
 	     })
-	     //sequence checkpoint
+	     
+	     //sequence checkpoint i.e last seq value where change point was calculated
 	     val seqChPt = Record(2)
 	     seqChPt.addInt(2)
 	     seqChPt.addString(keyStr + fieldDelimOut + seqValues(size - 1 - windowSize/2))
 	     checkPoints :+ seqChPt
 	   }).cache
 	   
+	   //filter seq checkpoints and change points
 	   val seqChPoint = chPtData.filter(v => v.getInt(0) == 2).map(v => v.getString(1)).cache
 	   val chngPoint = chPtData.filter(v => v.getInt(0) == 1).map(v => v.getString(1))
 	   
