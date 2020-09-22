@@ -111,7 +111,7 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	         case "AD" => new AndersonDarlingStatWindow(windowSize)
 	       }
 
-	       val chPoints = ArrayBuffer[Long]()
+	       val chPoints = ArrayBuffer[(Long, Double)]()
 	       
 	       //all values
 	       for (i <- 0 to (size - 1)) {
@@ -128,11 +128,12 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	           val stat = window.getStat()
 	           if (stat >= statCritValue) {
 	             val seqAtCp = seqValues(i - windowSize/2)
-	             chPoints += seqAtCp
+	             val chp = (seqAtCp, stat)
+	             chPoints += chp
 	             if (debugOn) {
 	               val wc = i - windowSize/2
 	               println("found chagepoint for ID " + keyStr +  " at timestamp " + seqAtCp + " at index " + wc + 
-	                   " stat " + BasicUtils.formatDouble(stat, 3))
+	                   " stat " + BasicUtils.formatDouble(stat, precision))
 	             }
 	           }
 	         }
@@ -142,7 +143,8 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	       chPoints.map(c => {
 	         val tagedValue = Record(2)
 	         tagedValue.addInt(1)
-	         tagedValue.addString(keyStr + fieldDelimOut + a + fieldDelimOut + c)
+	         tagedValue.addString(keyStr + fieldDelimOut + a + fieldDelimOut + c._1  + 
+	             fieldDelimOut + BasicUtils.formatDouble(c._2, precision))
 	         tagedValue
 	       })
 	     })
@@ -157,7 +159,7 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility with Out
 	   //filter seq checkpoints and change points
 	   val seqChPoint = chPtData.filter(v => v.getInt(0) == 2).map(v => v.getString(1)).cache
 	   val chngPoint = chPtData.filter(v => v.getInt(0) == 1).map(v => v.getString(1))
-	   
+	   	   
 	   if (debugOn) {
          val records = chngPoint.collect
          records.slice(0, 20).foreach(r => println(r))
