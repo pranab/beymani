@@ -1,0 +1,58 @@
+This tutorial is for time series change point detection for retail sales data
+
+Dependent script
+================
+Checkout the project avenir. Copy the lib and mlextra directory under python to a directory  at the same level
+as your working directory forp python script
+
+Build and Deployment
+====================
+Please refer to resorce/spark_dependency.txt for building all jars and the final uber jar filw
+
+Script and configuration
+========================
+Feel free to make changes in script exp_spark.sh and the configuration file exp.conf as per you
+environment
+
+Generate input
+==============
+Copt cpsale.py from python/app to your workig directory.
+Generate hourly sales data 
+./cpsale.py gen <num_days> > cps.txt
+
+num_days = num of days in past for which sales data data is generated
+
+Generate distribution for CVM two ssample statistic
+===================================================
+We use Monte Carlo simulation to generate distribution. When run it will output to the console 
+upper tail statistic. Save the output somewhere. You will need it to configure the Spark job
+
+Checkout the project avenir. In the python/app directory run the following
+
+./tsstat.py <num_iter> cvm <num_samo>
+num_iter = num of iterations for the simulator e.g 2000
+num_samp = num of samples for generated samples, which should be half the window size (the parameter
+window.size in cpsale.conf). I have set this parameter to 200. So num_samp should be 100
+
+You could skip this step, if use the values set for parameter stat.critValue
+
+Copy input to Spark directory
+=============================
+./cpsale.sh cpInp cps.txt
+
+Run Spark Job
+=============
+Chhose an upper  critical value for confidence interval any wher between .95 and .99 from the
+output of the MC simulator we ran earlier. Set the parameter stat.critValue in cpsale.conf
+
+Run
+./cpsale.sh cpPred
+
+Plot sales data and change points
+=================================
+./cpsale.py plot cps.txt DK75HUI45X ./output/cpsale/part-00000
+
+DK75HUI45X  is the ID of the product that change point in sales data
+
+
+   
