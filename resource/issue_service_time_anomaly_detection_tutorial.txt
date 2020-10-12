@@ -1,0 +1,77 @@
+This tutorial is for anaomaly detection for service time for an issue processing system  data using 
+statistical modeling. To ne more specidfic we will be using a z score based technique
+ 
+
+Environment
+===========
+Path etc shown here corresposnds to my environment. Please Change them  as needed  for your 
+environment
+
+Build
+=====
+Follow instructions in spark_dependency.txt
+
+Python dependency
+=================
+The shell script commands for data generation run python scripts for data generation. Before you run 
+the data generation commands do the following
+1. checkout project avenir
+2. copy the avenir/python/lib directory to ../lib with respect to your location of cpu_usage.py file
+
+
+Create normal data for modeling
+===============================
+./ticket.py gen <num_issues> > tick_tr.txt
+
+where
+num_issues = number of issues e.g 2000
+
+Copy modeling data
+./ticket.sh loadInp tick_tr.txt train
+
+Create test data
+================
+./ticket.py gen <num_issues> > tick.txt
+where
+num_issues = number of issues e.g 200
+
+insert outliers
+/ticket.py iol  tick.txt <outlier_percentage> > tick_pred.txt
+
+where
+<outlier_percentage = outlier percentage e.g 5
+
+copy test data
+./ticket.sh loadInp tick_pred.txt pred 
+
+
+Run Spark job for model
+=======================
+Set operation.type = "med" in ticket.conf
+run
+./ticket.sh numMstat
+copy output
+./ticket.sh bkMod med.txt
+
+Set operation.type = "mad" in ticket.conf
+run
+./ticket.sh numMstat
+copy output
+./ticket.sh bkMod mad.txt
+
+We assumed that the training data does not have outliers. If the data has outliers, then follow
+these steps
+1. build model
+2. detect outliers and remove them from the data
+3. build model again, but this time without outliers in the data
+
+Run Spark job to detect outliers
+================================
+./ticket.sh olPred
+
+Configuration
+=============
+Configuration is in and.conf. Make changes as necessary
+
+
+

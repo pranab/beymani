@@ -1,5 +1,6 @@
 This tutorial is for anaomaly detection in CPU usage data using statistical modeling. To ne more specidfic
-we will be using a z score based technique
+we will be using a z score based technique. Model gets built with oultliers in data. The detected outliers
+are removed and the model is built again, but htis time without outliers in the data.
  
 
 Environment
@@ -27,15 +28,13 @@ where
 num_of_days = number of days e.g 10
 reading_intervaL = reading interval in sec e.g. 300
 num_servers = number of servers e.g. 4
-output_file = output file, we will use c.txt from now on
+output_file = output file, we will use cusage.txt from now on
 
-Copy modeling data
-==================
 - insert outliers
 ./and_spark.sh insOutliers <normal_data_file> <with_outlier_data_file> 
 
 where
-normal_data_file = normal data file (c.txt)
+normal_data_file = normal data file (cusage.txt)
 with_outlier_data_file = data file with outliers (cusage.txt)
 
 -copy
@@ -64,6 +63,7 @@ Copy and consolidate clean file
 
 Copy test data
 ==============
+Create a normal data file as before
 - insert outliers
 ./and_spark.sh insOutliers <normal_data_file> <with_outlier_data_file> 
 
