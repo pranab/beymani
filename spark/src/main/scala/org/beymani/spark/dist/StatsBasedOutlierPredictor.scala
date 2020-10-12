@@ -82,6 +82,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val appAlgoConfig = appConfig.getConfig(predictorStrategy)
 	   val algoConfig = getConfig(predictorStrategy, appConfig, appAlgoConfig)
 	   val scoreThreshold:java.lang.Double = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")
+	   //println("scoreThreshold " + scoreThreshold)
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
 	   val keyFieldOrdinals =  toOptionalIntArray(keyFields)
@@ -186,18 +187,24 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	   val highIgnoredCounter = new LongAccumulator()
 	   val noIgnoredCounter = new LongAccumulator()
 	   val invalidScoreCounter = new LongAccumulator()
+	   sparkCntxt.register(lowIgnoredCounter, "lowIgnoredCounter")
+	   sparkCntxt.register(highIgnoredCounter, "highIgnoredCounter")
+	   sparkCntxt.register(noIgnoredCounter, "noIgnoredCounter")
+	   sparkCntxt.register(invalidScoreCounter, "invalidScoreCounter")
 	   
 	   
 	   //predict for each field in each line whether it's an outlier
 	   var keyLen = baseKeyLen
 	   val keyedThresholdValues = getperKeyThreshold(keyedThresholdFilePath, keyLen, keyLen)
 
+	   	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
 	   if (remOutliers)
 	     data.cache
 	     
-	   var taggedData = data.map(line => {
+	     
+ 	   var taggedData = data.map(line => {
 		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn, quotedFields)
 		   val key = Record(keyLen)
 		   Record.populateFieldsWithIndex(items, keyFieldOrdinals, key)
@@ -247,6 +254,10 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 			   val predictor = brPredictor.value
 			   val score:java.lang.Double = predictor.execute(items, keyStr)
 			   val threshold = getThreshold(key, keyedThresholdValues, scoreThreshold)
+			   if (debugOn) {
+			     println("score " + score + " threshold " + threshold)
+			   }
+			     
 			   var marker = if (score > threshold) "O"  else "N"
 			   if (!predictor.isValid(keyStr))  {
 			     //invalid prediction because of missing model
@@ -260,7 +271,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 				   val sdValues = statValues._2
 				   val keyWithFldOrd = keyStr + fieldDelimIn + quantFldOrd
 				   applyPolarityToOutlier(items, quantFldOrd, marker, outlierPolarity, keyWithFldOrd, mValues, 
-				       sdValues, stdDevMult, lowIgnoredCounter, highIgnoredCounter, noIgnoredCounter)
+				      sdValues, stdDevMult, lowIgnoredCounter, highIgnoredCounter, noIgnoredCounter)
 			   } else {
 			     marker
 			   }
@@ -421,6 +432,7 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
    * @param errorMsg
    * @return
    */
+   
    def applyPolarityToOutlier(items:Array[String], quantFldOrd:Int, label:String, outlierPolarity:String, key:String, 
        meanValues:java.util.Map[String,java.lang.Double], stdDevValues:java.util.Map[String,java.lang.Double], stdDevMult:Double,
        lowIgnoredCounter:LongAccumulator, highIgnoredCounter:LongAccumulator, noIgnoredCounter:LongAccumulator) : String = {
@@ -456,5 +468,6 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	     newLabel
 	   }
    }
+   
    
 }

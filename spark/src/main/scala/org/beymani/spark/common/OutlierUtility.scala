@@ -18,6 +18,7 @@
 package org.beymani.spark.common
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.util.LongAccumulator
 import scala.collection.JavaConverters._
 //import scala.collection.immutable.Map
 import org.chombo.util.BasicUtils
@@ -162,5 +163,7 @@ trait OutlierUtility {
 	   else  "N"
 	 label
 	}
+	
+ 	
 	
 }

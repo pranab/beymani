@@ -30,6 +30,7 @@ import org.chombo.util.ConfigUtility;
  *
  */
 public abstract class ModelBasedPredictor implements Serializable {
+	private static final long serialVersionUID = -8813946272356265424L;
 	protected boolean realTimeDetection;
 	protected double scoreThreshold;
 	protected boolean scoreAboveThreshold;
