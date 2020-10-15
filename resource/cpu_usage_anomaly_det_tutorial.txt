@@ -22,7 +22,7 @@ the data generation commands do the following
 
 Create base normal data
 =======================
-./and_spark.sh crInput <num_of_days> <reading_intervaL> <num_servers> <output_file>
+./and_spark.sh crInput <num_of_days> <reading_intervaL> <num_servers> true <output_file>
 
 where
 num_of_days = number of days e.g 10
@@ -53,17 +53,25 @@ Copy and consolidate stats file
 
 Run Spark job to detect outliers
 ================================
-Set output.outliers = true and rem.outliers = true
+- set 
+score.threshold = 2.0
+output.outliers = true
+rem.outliers = true
 
+- run
 ./and_spark.sh olPred
 
 Copy and consolidate clean file
 ===============================
 ./and_spark.sh crCleanFile
 
-Copy test data
-==============
-Create a normal data file as before
+Create and copy test data
+=========================
+- create 
+./and_spark.sh crInput <num_of_days> <reading_intervaL> <num_servers> true <stats_file> <output_file
+where
+stas_file = stats file path, which gets used to get all the server IDs
+
 - insert outliers
 ./and_spark.sh insOutliers <normal_data_file> <with_outlier_data_file> 
 
@@ -71,7 +79,7 @@ where
 normal_data_file = normal data file (c.txt)
 with_outlier_data_file = data file with outliers (cusage.txt)
 
--copy
+- copy
 ./and_spark.sh cpTestData <with_outlier_data_file> 
 
 where
@@ -89,8 +97,12 @@ Copy and consolidate stats file
 
 Run Spark job to detect outliers
 ================================
-Set output.outliers = true and rem.outliers = true
+- set
+score.threshold = 3.3
+output.outliers = false
+rem.outliers = false
 
+- run
 ./and_spark.sh olPred
 
 Configuration

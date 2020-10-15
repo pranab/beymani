@@ -281,14 +281,14 @@ object StatsBasedOutlierPredictor extends JobConfiguration with SeasonalUtility 
 	 
 	   if (outputOutliers || remOutliers) {
 	     taggedData = taggedData.filter(line => {
-		   val items = line.split(fieldDelimIn, -1)
-		   val marker = items(items.length - 1)
-		   marker.equals("O")
-	       })
+		     val items = line.split(fieldDelimIn, -1)
+		     val marker = items(items.length - 1)
+		     marker.equals("O")
+	     })
 	     if (remOutliers) {
 	       //additional output for input with outliers subtracted
 	       taggedData = taggedData.map(line => {
-		     val items = line.split(fieldDelimIn, -1)
+		       val items = line.split(fieldDelimIn, -1)
 	         val ar = items.slice(0, items.length - 2)
 	         ar.mkString(fieldDelimOut)
 	       })
