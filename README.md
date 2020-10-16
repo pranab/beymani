@@ -18,15 +18,20 @@ The following blogs of mine are good source of details of beymani
 * https://pkghosh.wordpress.com/2018/09/18/contextual-outlier-detection-with-statistical-modeling-on-spark/
 * https://pkghosh.wordpress.com/2018/10/15/learning-alarm-threshold-from-user-feedback-using-decision-tree-on-spark/
 * https://pkghosh.wordpress.com/2019/07/25/time-series-sequence-anomaly-detection-with-markov-chain-on-spark/
+* https://pkghosh.wordpress.com/2020/09/27/time-series-change-point-detection-with-two-sample-statistic-on-spark-with-application-for-retail-sales-data/
 
 ## Algorithms
-* Multi variate instance distribution model
+* Univarite  distribution model
 * Multi variate sequence or multi gram distribution model
 * Average instance Distance
 * Relative instance Density
 * Markov chain with sequence data
+* Spectral residue for sequence data
+* Quantized symbol mapping for sequence data
+* Local outlier factor for multivariate data
 * Instance clustering
 * Sequence clustering
+* Change point detection
 
 ## Getting started
 Project's resource directory has various tutorial documents for the use cases described in
