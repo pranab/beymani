@@ -38,14 +38,14 @@ import org.beymani.util.SeequenceScoreAggregator
  * @author pranab
  *
  */
-object SymbolMapPredictor extends JobConfiguration with GeneralUtility with OutlierUtility {
+object NgramFrequencyPredictor extends JobConfiguration with GeneralUtility with OutlierUtility {
   
    /**
    * @param args
    * @return
    */
    def main(args: Array[String]) {
-	   val appName = "symbolMapPredictor"
+	   val appName = "ngramFrequencyPredictor"
 	   val Array(inputPath: String, outputPath: String, configFile: String) = getCommandLineArgs(args, 3)
 	   val config = createConfig(configFile)
 	   val sparkConf = createSparkConf(appName, config, false)
