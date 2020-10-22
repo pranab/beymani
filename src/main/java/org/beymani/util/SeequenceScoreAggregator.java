@@ -28,7 +28,7 @@ import java.util.List;
  */
 public class SeequenceScoreAggregator implements java.io.Serializable {
 	private static final long serialVersionUID = 2181114339589177954L;
-	private List<SequencedScore> scores = new ArrayList<SequencedScore>();
+	private List<Double> scores = new ArrayList<Double>();
 	private int windowSize;
 	
 	
@@ -40,19 +40,19 @@ public class SeequenceScoreAggregator implements java.io.Serializable {
 		this.windowSize = windowSize;
 	}
 	
+	
 	/**
 	 * @param seq
 	 * @param score
 	 */
-	public void add(long seq, double score ) {
-		SequencedScore seqScore = new SequencedScore(seq, score);
-		scores.add(seqScore);
+	public void add(double score ) {
+		scores.add(score);
 		if (scores.size() > windowSize) {
 			//set score to max of current and new score
 			for (int i = scores.size() - windowSize; i < scores.size(); ++i) {
-				SequencedScore thisSeqScore = scores.get(i);
-				if (thisSeqScore.getScore() < score) {
-					thisSeqScore.setScore(score);
+				double thisSeqScore = scores.get(i);
+				if (thisSeqScore < score) {
+					scores.set(i, score);
 				}
 			}
 		}
@@ -61,7 +61,7 @@ public class SeequenceScoreAggregator implements java.io.Serializable {
 	/**
 	 * @return
 	 */
-	public List<SequencedScore> getScores() {
+	public List<Double> getScores() {
 		return scores;
 	}
 	

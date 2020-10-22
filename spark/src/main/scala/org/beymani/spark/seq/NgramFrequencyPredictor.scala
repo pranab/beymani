@@ -106,47 +106,53 @@ object NgramFrequencyPredictor extends JobConfiguration with GeneralUtility with
 	       val seq = v.getLong(0)
 	       val line = v.getString(1)
 	       val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
-	         val quant = items(attrOrd).toDouble
-	         val quantSym = HistogramUtility.getPercentileIndex(percentiles, quant).toString()
-	         window.add(quantSym)
-	         if (window.isProcessed()) {
-	           val ngCounts = window.getNgramCounts().asScala
-	           if (!isFullFirstTime) {
-	             //full count map first time window is full
-	             for ((ke, va) <- ngCounts) {
-	               ngMap += (ke -> va.toDouble)
-	             }
-	             isFullFirstTime = true
-	           } else {
-	             //incremental change, derement and increment count
-	             for ((ke, va) <- ngCounts) {
-	               if (va == -1) {
-	                 val count = ngMap.get(ke).get
-	                 ngMap(ke) = (count - 1)
-	               } else {
-	                 val count = ngMap.get(ke)
-	                 count match {
-	                   case Some(cnt) => ngMap(ke) = (cnt + 1)
-	                   case None => ngMap += (ke -> 1)
-	                 }
+	       val quant = items(attrOrd).toDouble
+	       val quantSym = HistogramUtility.getPercentileIndex(percentiles, quant).toString()
+	       window.add(quantSym)
+	       if (window.isProcessed()) {
+	         val ngCounts = window.getNgramCounts().asScala
+	         if (!isFullFirstTime) {
+	           //full count map first time window is full
+	           for ((ke, va) <- ngCounts) {
+	             ngMap += (ke -> va.toDouble)
+	           }
+	         } else {
+	           //incremental change, derement and increment count
+	           for ((ke, va) <- ngCounts) {
+	             if (va == -1) {
+	               val count = ngMap.get(ke).get
+	               ngMap(ke) = (count - 1)
+	             } else {
+	               val count = ngMap.get(ke)
+	               count match {
+	                 case Some(cnt) => ngMap(ke) = (cnt + 1)
+	                 case None => ngMap += (ke -> 1)
 	               }
 	             }
 	           }
-	           val ngMapNorm = maxNormalize(ngMap)
-	           val score = findNgramDiff(ngMapNorm, ngMapRef)
-	           scoreAggr.add(seq, score)
-	         }
-	       })
+	         } 
+	         val ngMapNorm = maxNormalize(ngMap)
+	         val score = findNgramDiff(ngMapNorm, ngMapRef)
+	         if (!isFullFirstTime) {
+	           //initialize scores list when window is filled first time
+	           for (j <- 0 to windowSize - 1) {
+	             scoreAggr.add(score)
+	           } 
+	           isFullFirstTime = true
+	         } 
+	         scoreAggr.add(score)	         
+	       } 
+	     })
 	       
-	       val recs = values.map(r => r.getString(1))
-	       val scores =  scoreAggr.getScores().asScala
-	       val taggedRecs = recs.zip(scores).map(r => {
-	         val rec = r._1
-	         val score = r._2.getScore()
-	         val tag = if (score > scoreThreshold) "O" else "N"
-	         rec + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + tag
-	       })
-         taggedRecs
+	     val recs = values.map(r => r.getString(1))
+	     val scores =  scoreAggr.getScores().asScala
+	     val taggedRecs = recs.zip(scores).map(r => {
+	       val rec = r._1
+	       val score = r._2
+	       val tag = if (score > scoreThreshold) "O" else "N"
+	       rec + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + tag
+	     })
+       taggedRecs
 	   })
 	   
 	   if (debugOn) {
