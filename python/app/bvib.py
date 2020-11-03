@@ -76,7 +76,7 @@ if __name__ == "__main__":
 				print("{},{},{:.3f}".format(mid, stime, val))				
 			stime += sintv
 					
-	elif op == "plot":
+	elif op == "iplot":
 		#plot
 		fpath = sys.argv[2]
 		mid = sys.argv[3]
@@ -102,6 +102,16 @@ if __name__ == "__main__":
 			print(",".join(rec))	
 			i += 1	
 		
+	elif op == "oplot":
+		#plot outliers
+		fpath = sys.argv[2]
+		mid = sys.argv[3]
+		beg = int(sys.argv[4])
+		end = int(sys.argv[5])
+		filt = lambda r : r[0] == mid
+		dvalues = list(map(lambda r : float(r[3]), fileFiltRecGen(fpath, filt)))
+		drawLine(dvalues[beg:end])
+
 	else:
 		exitWithMsg("ivalid command")
 			

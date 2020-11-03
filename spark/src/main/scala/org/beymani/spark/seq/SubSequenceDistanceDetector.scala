@@ -59,7 +59,7 @@ object SubSequenceDistanceDetector extends JobConfiguration with GeneralUtility 
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrd", "missing seq field ordinal")
 	   val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	
 	   val windowSize = getIntParamOrElse(appConfig, "window.size", 3)
-	   val refFilePath = getOptionalStringParam(appConfig, "distr.file.path")
+	   val refFilePath = getOptionalStringParam(appConfig, "ref.filePath")
      val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 		 val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
@@ -115,7 +115,7 @@ object SubSequenceDistanceDetector extends JobConfiguration with GeneralUtility 
 	     
 	     //distance based score
 	     val scoreAggr = new SeequenceScoreAggregator(windowSize)
-	     for (i <- 0 to rValues.length - windowSize) {
+	     for (i <- 0 to tValues.length - windowSize) {
 	       val score = getMinDist(tValues, i, rValues, windowSize, sameRefData)
 	       if (i == 0) {
 	         for (j <- 0 to windowSize - 1) {
@@ -127,7 +127,7 @@ object SubSequenceDistanceDetector extends JobConfiguration with GeneralUtility 
 	     }
 	     
 	     //recors with score and tag
-	     val recs = rRecs.map(r => r.getString(2))
+	     val recs = tRecs.map(r => r.getString(2))
 	     val scores =  scoreAggr.getScores().asScala
 	     val taggedRecs = recs.zip(scores).map(r => {
 	       val rec = r._1
