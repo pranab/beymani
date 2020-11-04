@@ -21,11 +21,10 @@ from random import randint
 import time
 import math
 from datetime import datetime
+import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath("../lib"))
-sys.path.append(os.path.abspath("../mlextra"))
 from util import *
 from mlutil import *
-from daexp import *
 from sampler import *
 
 """
@@ -110,7 +109,20 @@ if __name__ == "__main__":
 		end = int(sys.argv[5])
 		filt = lambda r : r[0] == mid
 		dvalues = list(map(lambda r : float(r[3]), fileFiltRecGen(fpath, filt)))
-		drawLine(dvalues[beg:end])
+		xvalues = list(map(lambda r : int(r[1]), fileFiltRecGen(fpath, filt)))
+		plt.plot(xvalues[beg:end], dvalues[beg:end])
+		plt.title("outlier score")
+		plt.show()
+		
+		dvalues = list(map(lambda r : float(r[2]), fileFiltRecGen(fpath, filt)))
+		plt.plot(xvalues, dvalues, "b")
+		ofilt = lambda r : r[0] == mid and r[4] == "O"
+		oxvalues = list(map(lambda r : int(r[1]), fileFiltRecGen(fpath, ofilt)))
+		for t in oxvalues:
+			plt.axvline(t, 0, .9, color="r")
+		plt.title("outliers")
+		plt.show()
+		
 
 	else:
 		exitWithMsg("ivalid command")

@@ -1,0 +1,59 @@
+This tutorial is for time series anomaly detection for machinary vibration  data using sub sequence
+dissimilarity
+
+Dependent script
+================
+Checkout the project avenir. Copy the lib  directory under python to a directory  at the same level
+as your working directory forp python script
+
+Build and Deployment
+====================
+Please refer to resorce/spark_dependency.txt for building all jars and the final uber jar filw
+
+Script and configuration
+========================
+Feel free to make changes in script exp_spark.sh and the configuration file exp.conf as per you
+environment
+
+Generate input
+==============
+-Copy bvib.py from python/app to your workig directory.
+
+-Generate vibration  data 
+./bvib.py gen <num_secs> > v.txt
+
+where
+num_secs = num of secs in past for which vibration data data is generated e.g 7
+
+-Split into reference and prediction data
+split -l10000 v.txt
+mv xaa vib_ref.txt
+
+-Insert outliers in prediction or test data data
+./bvib.py  iol xab  <failure_onset_time> > vib_pred.txt
+failure_onset_time = time from beginning of test data where  outlier in inserted. Outlier is 
+in the form of 2 high frequecy componenets
+
+-You could plot the data around where outliers were introduced as follows
+./bvib.py iplot vib_pred.txt K87JG9F6  900 1100
+
+K87JG9F6  is the ID of the machine that is faulty and has outliers in the vibration data
+
+-Copy reference and prediction data
+cp vib_ref.txt ./other/vib/
+cp vib_pred.txt ./input/vib/
+
+
+Run Spark Job
+=============
+Run
+./vib.sh olPred
+
+Plot outlier data
+=================
+./bvib.py oplot ./output/vib/part-00000 K87JG9F6  900 1100
+
+K87JG9F6  is the ID of the machine that is faulty and has outliers in the vibration data
+
+
+   
