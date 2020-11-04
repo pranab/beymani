@@ -1,4 +1,19 @@
-#!/usr/bin/python
+#!/usr/local/bin/python3
+
+# avenir-python: Machine Learning
+# Author: Pranab Ghosh
+# 
+# Licensed under the Apache License, Version 2.0 (the "License"); you
+# may not use this file except in compliance with the License. You may
+# obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0 
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
 
 import os
 import sys
@@ -6,6 +21,7 @@ from random import randint
 import time
 import uuid
 import threading
+import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath("../lib"))
 from util import *
 from sampler import *
@@ -33,7 +49,8 @@ if __name__ == "__main__":
 			mean = randomFloat(mmin, mmax)
 			sd = randomFloat(smin, smax)
 			devId = genID(12)
-			print "%s,%.3f,%.3f" %(devId, mean, sd)
+			#print "%s,%.3f,%.3f" %(devId, mean, sd)
+			print("{},{:.3f},{:.3f}".format(devId, mean, sd))
 			
 	#generate reading		
 	elif op == "gen":
@@ -102,7 +119,19 @@ if __name__ == "__main__":
 					if not sampled:
 						# normal
 						reading = distrs[i].sample()
-				print "%s,%d,%d" %(did, ts, int(reading))
+				
+				#print "%s,%d,%d" %(did, ts, int(reading))
+				print("{},{},{}".format(did, ts, int(reading)))
 			sampTime += sampIntv 
 
+	elif op == "oplot":
+		#plot outliers
+		fpath = sys.argv[2]
+		mid = sys.argv[3]
+		filt = lambda r : r[0] == mid
+		dvalues = list(map(lambda r : float(r[3]), fileFiltRecGen(fpath, filt)))
+		xvalues = list(map(lambda r : int(r[1]), fileFiltRecGen(fpath, filt)))
+		plt.plot(xvalues, dvalues)
+		plt.title("outlier score")
+		plt.show()
 				

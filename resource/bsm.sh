@@ -62,6 +62,13 @@ case "$1" in
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
 	--conf spark.ui.killEnabled=true --master $MASTER $JAR_NAME  $INPUT $OUTPUT bsm.conf
 	rm -rf ./output/bsm/pred/oul/_SUCCESS
+	ls -l ./output/bsm/pred/oul
+	for f in ./output/bsm/pred/oul/*
+	do
+		echo "number of  outliers in $f"
+		cat $f | grep ,O | wc -l
+	done	
+
 ;;
 
 *) 

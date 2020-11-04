@@ -68,6 +68,7 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	   val stateTransCompact = getBooleanParamOrElse(appConfig, "stateTrans.compact", true)
 	   val fileLines = BasicUtils.getFileLines(stateTransFilePath)
 	   val expConst :java.lang.Double = getDoubleParamOrElse(appConfig, "exp.const", 1.0)
+	   println("expConst " + expConst)
 	   val globalModel = getBooleanParamOrElse(appConfig, "model.global", false)
 	   val ignoreMissingModel = getBooleanParamOrElse(appConfig, "ignore.missingModel", false)
 	   val keyedThresholdFilePath = getOptionalStringParam(appConfig, "path.thresholdByKey")
@@ -89,10 +90,10 @@ object MarkovChainPredictor extends JobConfiguration with OutlierUtility  with G
 	   val data = sparkCntxt.textFile(inputPath)
 	   	   
 	   val taggedData = data.map(line => {
-		 val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
-		 val key = Record(keyLen)
-		 addPrimarykeys(items, keyFields,  key)
-		 addSeasonalKeys(this, appConfig,analyzerMap, analyzers, items, seasonalAnalysis, key)
+		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
+		   val key = Record(keyLen)
+		   addPrimarykeys(items, keyFields,  key)
+		   addSeasonalKeys(this, appConfig,analyzerMap, analyzers, items, seasonalAnalysis, key)
 	     val value = Record(2)
 	     value.addLong(items(seqFieldOrd).toLong)
 	     value.addString(line)
