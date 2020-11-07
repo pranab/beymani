@@ -176,7 +176,7 @@ object SubSequenceDistanceDetector extends JobConfiguration with GeneralUtility 
 
 	     val value = Record(3)
 	     val seq = items(seqFieldOrd).toLong
-	     value.addLong(preFix)
+	     value.addInt(preFix)
 	     value.addLong(seq)
 	     value.addString(line)
 	     (key, value)
