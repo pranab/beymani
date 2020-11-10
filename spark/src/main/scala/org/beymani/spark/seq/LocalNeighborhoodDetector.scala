@@ -71,7 +71,6 @@ object LocalNeighborhoodDetector extends JobConfiguration with GeneralUtility wi
 	       "neighborhoosd size must be provided")
 	   
 	   //input
-		 var  sameRefData = false
 	   val data = sparkCntxt.textFile(inputPath)
 	   val keyedData = getKeyedValueWithSeq(data, fieldDelimIn, keyLen, keyFieldOrdinals, seqFieldOrd)
 		 
@@ -80,7 +79,7 @@ object LocalNeighborhoodDetector extends JobConfiguration with GeneralUtility wi
        val key = v._1
 	     val values = v._2.toList.sortBy(v => v.getLong(0))
 	     val size = values.length
-	     val coffset = size / 2 - 1
+	     val coffset = windowSize / 2
 	     val window = if (neighborhoodDistBased) {
          new LocalNeighborhoodWindow(windowSize, neighborhoodDist)
 	     } else {
