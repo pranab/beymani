@@ -17,6 +17,7 @@
 
 package org.beymani.multi
 
+import scala.collection.JavaConverters._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.chombo.spark.common.GeneralUtility
@@ -50,11 +51,18 @@ object IsolationForestDetector extends JobConfiguration with GeneralUtility with
 	   val subsampleSize = getIntParamOrElse(appConfig, "subsample.size", 100);
 	   val defMaxDepth = Math.log(subsampleSize).toInt
 	   val maxDepth = getIntParamOrElse(appConfig, "max.depth", defMaxDepth);
+	   val countFilePath = getMandatoryStringParam(appConfig, "count.filePath", "missing per key record count file")	
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3);
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 	   
 	   val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
+	   val perKeyRecCount = BasicUtils.getKeyedValues(countFilePath, keyLen, keyLen).asScala
+	   val perKeyRecSampCount = perKeyRecCount.map(r => {
+	     val rawCount = r._2.toInt
+	     val count = if (rawCount > subsampleSize) subsampleSize else rawCount
+	     (r._1, count)
+	   })
 	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
@@ -89,8 +97,9 @@ object IsolationForestDetector extends JobConfiguration with GeneralUtility with
 
 	   //grow tree
 	   var done = false
+	   var trPathRecs = trRecs
 	   while (!done) {
-	     val trPathRecs = trRecs.groupByKey.flatMap(v => {
+	     trPathRecs = trPathRecs.groupByKey.flatMap(v => {
 	       val key = v._1
 	       val recs = v._2.toArray
 	       val size = recs.length
@@ -146,8 +155,102 @@ object IsolationForestDetector extends JobConfiguration with GeneralUtility with
 	       }
 	       trPathRecs
 	     })
+	     
+	     //check if tree building done
+	     trPathRecs.cache()
+	     val interNodeCount = trPathRecs.groupByKey.map(v => {
+	       val key = v._1
+	       val recs = v._2.toArray
+	       val size = recs.length
+	       
+	       //current depth
+	       val tPath = key.getString(2)
+	       val depth = if (tPath.isEmpty()) 0 else tPath.split(":").length
+	       val newKey = Record(key)
+	       val isInternal = !(size == 1 || depth == maxDepth)
+	       (newKey, isInternal)
+	     }).filter(r => r._2).count()
+	     
+	     done = interNodeCount == 0
 	   }
 
+	   //key by ID
+	   val keyedRecs = trPathRecs.groupByKey.flatMap(v => {
+	     val key = v._1
+	     val recs = v._2.toArray
+	     recs.map(v => {
+	       val newKey = Record(keyLen, key)
+	       val newVal = Record(3)
+	       newVal.addInt(key.getInt(keyLen))
+	       newVal.addString(key.getString(keyLen + 1))
+	       newKey.addString(v)
+	       (newKey, newKey)
+	     })
+	   })
+	   
+	   
+	   //anomaly score
+	   val taggedRecs = keyedRecs.groupByKey.flatMap(v => {
+	     val key = v._1
+	     val keyStr = key.toString
+	     val recCount = perKeyRecSampCount.get(keyStr).get
+	     val avTreePathLen = avgPathLength(recCount)
+	     val recs = v._2.toArray
+	     val taggedRecs = ArrayBuffer[String]()
+	     
+	     //keyed by tree ID and path
+	     var tpaRecs = Map[Record, ArrayBuffer[String]]()
+	     recs.foreach(v => {
+	       val nKey = Record(2, v)
+	       val lines = tpaRecs.getOrElse(nKey, ArrayBuffer[String]())
+	       lines += v.getString(2)
+	       if (lines.length == 1) {
+	         tpaRecs += (nKey -> lines)
+	       }
+	     })
+	     
+	     //score for each record  from different trees
+	     var scores = Map[String, ArrayBuffer[Double]]()
+	     tpaRecs.foreach(r => {
+	       val tKey = r._1
+	       val tPathLen = tKey.getString(1).split(":").length
+	       val lines = tpaRecs.get(tKey).get
+	       val size = lines.length
+	       val score = (if (size == 1) tPathLen else tPathLen + avgPathLength(size)).toDouble
+	       lines.foreach(line => {
+	         val lineScores = scores.getOrElse(line, ArrayBuffer[Double]())
+	         if (lineScores.length == 0) {
+	           scores += (line -> lineScores)
+	         }
+	         lineScores += score
+	       })
+	       
+	       //average path length and anomaly score
+	       val avScores = scores.map(r => {
+	         val avgPathLen = getDoubleSeqAverage(r._2)
+	         val score = Math.pow(2.0, - avgPathLen / avTreePathLen)
+	         val tag = if (score > scoreThreshold) "O" else "N"
+	         val taggedRec = r._1 + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + tag
+	         taggedRecs += taggedRec
+	       })
+	     })
+	     taggedRecs
+	   })
+	   
+	   if (debugOn) {
+       val records = taggedRecs.collect
+       records.slice(0, 50).foreach(r => println(r))
+     }
+	   
+	   if(saveOutput) {	   
+	     taggedRecs.saveAsTextFile(outputPath) 
+	   }	 
+	   
+   }
+   
+   def avgPathLength(count : Int) : Double = {
+     val dCount = count.toDouble
+     2.0 * ((Math.log(dCount - 1) + 0.5772156649) -  (dCount - 1) / dCount)
    }
   
 }
