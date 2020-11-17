@@ -23,9 +23,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sklearn as sk
 from sklearn.ensemble import IsolationForest
+from pyod.models.auto_encoder import AutoEncoder
 sys.path.append(os.path.abspath("../lib"))
 sys.path.append(os.path.abspath("../mlextra"))
 from util import *
+from mlutil import *
 from sampler import *
 
 """
@@ -34,18 +36,20 @@ Anomaly detection with isolation forest
 if __name__ == "__main__":
 	op = sys.argv[1]
 	filePath = sys.argv[2]
-	scId = sys.argv[3]
-	columns = strToIntArray(sys.argv[4])
 	window = 20
-	beg = 20
+	beg = 0
 	end = beg + window
 	if op == "isfo":
+		scId = sys.argv[3]
+		colStr = sys.argv[4]
+		columns = strToIntArray(colStr)
 		filt = lambda r : r[0] == scId
-		data = np.array(getFileAsFiltFloatMatrix(filePath, filt, columns))
+		data = np.array(getFileAsFiltFloatMatrix(filePath, filt, colStr))
 		nsamp = data.shape[0]
 		isf = IsolationForest(contamination=0.1)
 		ypred = isf.fit_predict(data)
 		colors = ["m", "g", "b", "c", "y"]
+		
 		for i, c in enumerate(columns):
 			dvalues = data[:,i]
 			if i == 2:
@@ -59,5 +63,39 @@ if __name__ == "__main__":
 				count += 1
 		print("num of outlier {}".format(count))
 		plt.show()
+	elif op == "auen":
+		teFilePath = sys.argv[3]
+		columns = sys.argv[4]
+		auen = AutoEncoder(hidden_neurons =[7,5,3,5,7])	
+		trData = np.array(getFileAsFloatMatrix(filePath, columns))
+		trNsamp = trData.shape[0]
+		teData = np.array(getFileAsFloatMatrix(teFilePath, columns))
+		aData = np.vstack((trData, teData))
+		aData = scaleData(aData, "zscale")
+		print(aData.shape)
+		trData = aData[:trNsamp, :]
+		teData = aData[trNsamp:, :]
+		print(trData.shape)
+		print(teData.shape)
+		
+		auen.fit(trData)
+		scores = auen.decision_function(teData)
+		
+		while True:
+			inp = input("begin offset: ")
+			beg = int(inp)
+			end = beg + window
+			if beg >= 0:
+				plt.plot(scores[beg:end], color="b")
+				count = 0
+				for i in  range(beg, end, 1):
+					if scores[i] > 17:
+						plt.axvline(i - beg, 0, .9, color="r")
+						count += 1
+				print("num of outlier {}".format(count))
+				plt.show()
+			else:
+				print("quitting")
+				break
 		
 		
