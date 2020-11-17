@@ -39,7 +39,8 @@ if __name__ == "__main__":
 	window = 20
 	beg = 0
 	end = beg + window
-	if op == "isfo":
+	if op == "isfo": 
+		#anomaly detection in in service ticket data with isolation porest
 		scId = sys.argv[3]
 		colStr = sys.argv[4]
 		columns = strToIntArray(colStr)
@@ -50,20 +51,30 @@ if __name__ == "__main__":
 		ypred = isf.fit_predict(data)
 		colors = ["m", "g", "b", "c", "y"]
 		
-		for i, c in enumerate(columns):
-			dvalues = data[:,i]
-			if i == 2:
-				dvalues = dvalues / 24
-			ci = i % 5
-			plt.plot(dvalues[beg:end], colors[ci])
-		count = 0
-		for i in  range(beg, end, 1):
-			if ypred[i] == -1:
-				plt.axvline(i - beg, 0, .9, color="r")
-				count += 1
-		print("num of outlier {}".format(count))
-		plt.show()
+		for a in data:
+			a[2] = a[2] / 24
+		while True:
+			inp = input("begin offset: ")
+			beg = int(inp)
+			end = beg + window
+			if beg >= 0:
+				for i in range(len(columns)):
+					dvalues = data[:,i]
+					ci = i % 5
+					plt.plot(dvalues[beg:end], colors[ci])
+				count = 0
+				for i in  range(beg, end, 1):
+					if ypred[i] == -1:
+						plt.axvline(i - beg, 0, .9, color="r")
+						count += 1
+				print("num of outlier {}".format(count))
+				plt.show()
+			else:
+				print("quitting")
+				break
+		
 	elif op == "auen":
+		#anomaly detection in web session with auto encoder
 		teFilePath = sys.argv[3]
 		columns = sys.argv[4]
 		auen = AutoEncoder(hidden_neurons =[7,5,3,5,7])	
