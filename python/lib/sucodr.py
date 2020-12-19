@@ -24,12 +24,13 @@ import numpy as np
 import matplotlib
 import random
 import jprops
-import statistics 
+import statistics as stat
 from matplotlib import pyplot
 sys.path.append(os.path.abspath("../lib"))
 from util import *
 from mlutil import *
 from sampler import *
+from stats import *
 
 class SupConceptDrift(object):
 	"""
@@ -41,18 +42,24 @@ class SupConceptDrift(object):
 		self.sdMin = None
 		self.count = 0
 		self.ecount = 0
-
+		self.sum = 0.0
+		self.sumSq = 0.0		
+		self.diMeanMax = None
+		self.diSdMax = None
+		self.maxAccRate = None
+		
 	def ddm(self, values, warmUp=0):
 		"""
 		DDM algorithm
 		"""
-		for i in range(warmUp):
-			if (values[i] == 1):
-				self.ecount += 1
-			self.count += 1
-		self.prMin = self.ecount / self.count
-		self.sdMin = math.sqrt(self.prMin * (1 - self.prMin) / self.count )
-		print("min {:.6f},{:.6f}".format(self.prMin, self.sdMin))
+		if warmUp > 0:
+			for i in range(warmUp):
+				if (values[i] == 1):
+					self.ecount += 1
+				self.count += 1
+			self.prMin = self.ecount / self.count
+			self.sdMin = math.sqrt(self.prMin * (1 - self.prMin) / self.count )
+			#print("min {:.6f},{:.6f}".format(self.prMin, self.sdMin))
 		
 		result = list()
 		for i in range(warmUp, len(values), 1):
@@ -68,12 +75,151 @@ class SupConceptDrift(object):
 			if (pr + sd) < (self.prMin +  self.sdMin):
 				self.prMin = pr
 				self.sdMin = sd
-				print("counts {},{}".format(self.count, self.ecount))
-				print("min {:.6f},{:.6f}".format(self.prMin, self.sdMin))
+				#print("counts {},{}".format(self.count, self.ecount))
+				#print("min {:.6f},{:.6f}".format(self.prMin, self.sdMin))
 			
 		return result
 			
+	def ddmSave(self, fpath):
+		"""
+		save DDM algorithm state
+		"""
+		ws = dict()
+		ws["count"] = self.count
+		ws["ecount"] = self.ecount
+		ws["prMin"] = self.prMin
+		ws["sdMin"] = self.sdMin
+		ws["threshold"] = self.threshold
+		saveObject(ws, fpath)
+			
+	def ddmRestore(self, fpath):
+		"""
+		restore DDM algorithm state
+		"""
+		ws = restoreObject(fpath)
+		self.count = ws["count"]
+		self.ecount = ws["ecount"]
+		self.prMin = ws["prMin"]
+		self.sdMin = ws["sdMin"]
+		self.threshold = ws["threshold"]
+		
+		
+	def eddm(self, values, warmUp=0):
+		"""
+		EDDM algorithm
+		"""
+		rstat = RunningStat.create( self.count, self.sum. self.sumSq)
+		lastEr = None
+		maxLim = 0.0
+		if warmUp > 0:
+			for i in range(warmUp):
+				if (values[i] == 1):
+					if lastEr is not None:
+						dist = i - lastEr
+						rstat.add(dist)
+					lastEr = i
+			assertGreater(rstat.getCount(), 20, "not enough samples")
+			re = rstat.getStat()
+			
+			self.diMeanMax = re[0]
+			self.diSdMax = re[1]
+			maxLim = self.diMeanMax + 2.0 * self.diSdMax	
+		
+		result = list()
+		for i in range(warmUp, len(values), 1):
+			if (values[i] == 1):
+				if lastEr is not  None:
+					dist = i - lastEr
+					re = rstat.addGetStat(dist)
+					cur = re[0] + 2.0 * re[1]
+					if cur > maxLim:
+						self.diMeanMax = re[0]
+						self.diSdMax = re[1]
+						maxLim = cur
+					dr = i if (cur / maxLim < self.threshold)  else 0
+				lastEr = i
+				r = (re[0],re[1], cur, dr)
+			else:
+				r = (0.0, 0.0, 0.0, 0)		
+			result.append(r)								
+		
+		(self.count, self.sum, self.sumSq) = rstat.getState()
+		return result
+		
+	def eddmSave(self, fpath):
+		"""
+		save EDDM algorithm state
+		"""
+		ws = dict()
+		ws["count"] = self.count
+		ws["sum"] = self.sum
+		ws["sumSq"] = self.sumSq
+		ws["diMeanMax"] = self.diMeanMax
+		ws["diSdMax"] = self.diSdMax
+		ws["threshold"] = self.threshold
+		saveObject(ws, fpath)
+
+	def eddmRestore(self, fpath):
+		"""
+		restore DDM algorithm state
+		"""
+		ws = restoreObject(fpath)
+		self.count = ws["count"]
+		self.sum = ws["sum"]
+		self.sumSq = ws["sumSq"]
+		self.diMeanMax = ws["diMeanMax"]
+		self.diSdMax = ws["diSdMax"]
+		self.threshold = ws["threshold"]
+
+	def fhddm(self, values, confLevel, winSize=20):
+		"""
+		FHDDM algorithm
+		"""
+		result = list()
+		accCount = 0
+		threshold = math.sqrt(0.5 * math.log(2 / confLevel) * winSize )
+		for i in range(winSize):
+			if values[i] == 0:
+				accCount += 1
+		if self.maxAccRate is None:
+			self.maxAccRate = accCount / winSize
+		else:
+			if accRate > self.maxAccRate:
+				self.maxAccRate = accRate
+			dr = 1 if (self.maxAccRate - accRate) > threshold else 0
+			r = (accRate, dr)
+			result.append(r)
 			
 		
-		
+		for i in range(winSize, len(values), 1):
+			end = i - winSize
+			if values[end] == 0:
+				accCount -= 1
+			if values[i] == 0:
+				accCount += 1
+			accRate = accCount / winSize
+			if accRate > self.maxAccRate:
+				self.maxAccRate = accRate
+			dr = 1 if (self.maxAccRate - accRate) > threshold else 0
+			r = (accRate, dr)
+			result.append(r)
+		return result
+
+	def fhddmSave(self, fpath):
+		"""
+		save EDDM algorithm state
+		"""
+		ws = dict()
+		ws["maxAccRate"] = self.maxAccRate
+		saveObject(ws, fpath)
+			
+	def fhddmRestore(self, fpath):
+		"""
+		restore DDM algorithm state
+		"""
+		ws = restoreObject(fpath)
+		self.maxAccRate = ws["maxAccRate"]
+			
+			
+			
 	
