@@ -36,28 +36,53 @@ if __name__ == "__main__":
 	if op == "agen":
 		#abrupt drift
 		nsamp = int(sys.argv[2])
-		trans = int(.4 * nsamp)
 		oerate = float(sys.argv[3])
-		nerate = float(sys.argv[4])
 		osampler = BernoulliTrialSampler(oerate)
-		nsampler = BernoulliTrialSampler(nerate)
+		trans = None
+		if len(sys.argv) == 6:
+			trans = int(float(sys.argv[4]) * nsamp)
+			nerate = float(sys.argv[5])
+			nsampler = BernoulliTrialSampler(nerate)
 		curTime, pastTime = pastTime(10, "d")
 		stime = pastTime
 		for i in range(nsamp):
-			if i < trans:
-				er = 1 if osampler.sample() else 0
-			else:
+			if trans is not None and i > trans:
 				er = 1 if nsampler.sample() else 0
+			else:
+				er = 1 if osampler.sample() else 0
 			rid = genID(10)
 			stime += random.randint(30, 300) 
 			print("{},{},{}".format(rid, stime, er))
 			
+	if op == "plot":
+		fpath = sys.argv[2]
+		evals = getFileColumnAsInt(fpath, 2, ",")
+		drawLine(evals)
+		
 	elif op == "ddm":
 		#DDM detector
 		fpath = sys.argv[2]
 		evals = getFileColumnAsInt(fpath, 2, ",")
 		detector = SupConceptDrift(3.5)
 		res = detector.ddm(evals, 30)
+		for r in res:
+			print("{:.3f},{:.3f},{:.3f},{}".format(r[0],r[1],r[2],r[3]))
+		dr = list(map(lambda v: v[3], res))
+		drawLine(dr)
+		
+	elif op == "eddm":
+		#DDM detector
+		fpath = sys.argv[2]
+		bootstrap = len(sys.argv) == 4 and sys.argv[3] == "true"
+		evals = getFileColumnAsInt(fpath, 2, ",")
+		detector = SupConceptDrift(0.9)
+		if bootstrap:
+			res = detector.eddm(evals, 700)
+		else:
+			detector.eddmRestore("./model/eddm.mod")
+			res = detector.eddm(evals)
+		detector.eddmSave("./model/eddm.mod")
+		
 		for r in res:
 			print("{:.3f},{:.3f},{:.3f},{}".format(r[0],r[1],r[2],r[3]))
 		dr = list(map(lambda v: v[3], res))

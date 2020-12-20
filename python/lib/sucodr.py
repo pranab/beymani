@@ -108,9 +108,10 @@ class SupConceptDrift(object):
 		"""
 		EDDM algorithm
 		"""
-		rstat = RunningStat.create( self.count, self.sum. self.sumSq)
+		rstat = RunningStat.create(self.count, self.sum, self.sumSq)
 		lastEr = None
 		maxLim = 0.0
+		result = list()
 		if warmUp > 0:
 			for i in range(warmUp):
 				if (values[i] == 1):
@@ -118,14 +119,16 @@ class SupConceptDrift(object):
 						dist = i - lastEr
 						rstat.add(dist)
 					lastEr = i
-			assertGreater(rstat.getCount(), 20, "not enough samples")
+				r = (0.0, 0.0, 0.0, 0)
+				result.append(r)
+			assertGreater(rstat.getCount(), 10, "not enough samples")
 			re = rstat.getStat()
 			
 			self.diMeanMax = re[0]
 			self.diSdMax = re[1]
 			maxLim = self.diMeanMax + 2.0 * self.diSdMax	
 		
-		result = list()
+		pdr = 0
 		for i in range(warmUp, len(values), 1):
 			if (values[i] == 1):
 				if lastEr is not  None:
@@ -136,11 +139,14 @@ class SupConceptDrift(object):
 						self.diMeanMax = re[0]
 						self.diSdMax = re[1]
 						maxLim = cur
-					dr = i if (cur / maxLim < self.threshold)  else 0
+					dr = 1 if (cur / maxLim < self.threshold)  else 0
+					r = (re[0],re[1], cur, dr)
+					pdr = dr
+				else:
+					r = (0.0, 0.0, 0.0, pdr)
 				lastEr = i
-				r = (re[0],re[1], cur, dr)
 			else:
-				r = (0.0, 0.0, 0.0, 0)		
+				r = (0.0, 0.0, 0.0, pdr)		
 			result.append(r)								
 		
 		(self.count, self.sum, self.sumSq) = rstat.getState()
@@ -156,7 +162,6 @@ class SupConceptDrift(object):
 		ws["sumSq"] = self.sumSq
 		ws["diMeanMax"] = self.diMeanMax
 		ws["diSdMax"] = self.diSdMax
-		ws["threshold"] = self.threshold
 		saveObject(ws, fpath)
 
 	def eddmRestore(self, fpath):
@@ -169,7 +174,6 @@ class SupConceptDrift(object):
 		self.sumSq = ws["sumSq"]
 		self.diMeanMax = ws["diMeanMax"]
 		self.diSdMax = ws["diSdMax"]
-		self.threshold = ws["threshold"]
 
 	def fhddm(self, values, confLevel, winSize=20):
 		"""
