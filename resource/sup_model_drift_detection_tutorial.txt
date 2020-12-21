@@ -1,0 +1,40 @@
+This tutorial is forconcept  drift detection of supervised machine learning  models with EDDM algorithm
+
+
+Setup
+=====
+Make sure you have python/lib directory of avenir project with all the python files wrt 
+where codrift.py is as a peer directory i.e at ../lib  Copy sucodr.py from beymani/python/lob 
+directory to your lib directory
+
+Generate Data
+=============
+- Generate refrence model prediction data 
+./codrift.py agen <nsamp> <er_rate> > er1.txt
+where
+nsamp = num of samples e.g. 2000
+er_rate = error rate e.g 0.1
+
+- Generate model prediction data with drift present
+./codrift.py agen <nsamp> <er_rate> <trans> <dr_er_rate> > er2.txt
+where
+trans = transition point for drift e.g 0.4 which means drift will appear after
+the first 40% of the data
+dr_er_rate = increased error rate after drift e.g 0.2
+
+Create reference statistics
+===========================
+Make sure you have directory called  model under the working directory
+
+Run
+./codrift.py eddm er1.txt true <bootstrap_size>
+where 
+bootstrap_size = no of samples to be used boot strapping and creating referenece statistic e.g 600
+it will detect drift for the remaining samples. In our case it won't because er1.txt does not contain
+any error data with drift
+
+Detect drift
+============
+./codrift.py eddm er2.txt
+In our case drift will be detected, because about half way through the error data, the error rate dobles
+to simulate drift. For real prouction data, you may or may not find drift
