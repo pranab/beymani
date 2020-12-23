@@ -54,6 +54,34 @@ if __name__ == "__main__":
 			stime += random.randint(30, 300) 
 			print("{},{},{}".format(rid, stime, er))
 			
+	if op == "agenlp":
+		#abrupt drift for learner pair drift detector
+		nsamp = int(sys.argv[2])
+		oerate = float(sys.argv[3])
+		osampler = BernoulliTrialSampler(oerate)
+		trans = None
+		if len(sys.argv) == 6:
+			trans = int(float(sys.argv[4]) * nsamp)
+			nerate = float(sys.argv[5])
+			nsampler = BernoulliTrialSampler(nerate)
+
+		curTime, pastTime = pastTime(10, "d")
+		stime = pastTime
+		for i in range(nsamp):
+			if trans is not None and i > trans:
+				er1 = 1 if nsampler.sample() else 0
+				if er1 == 1:
+					er2 = 0 if isEventSampled(50)  else er1
+				else:
+					er2 = 1 if isEventSampled(10)  else er1
+			else:
+				er1 = 1 if osampler.sample() else 0
+				er2 =  er1 ^ 1 if isEventSampled(5) else er1
+			rid = genID(10)
+			stime += random.randint(30, 300) 
+			print("{},{},{},{}".format(rid, stime, er1, er2))
+		
+
 	if op == "plot":
 		fpath = sys.argv[2]
 		evals = getFileColumnAsInt(fpath, 2, ",")
@@ -73,11 +101,12 @@ if __name__ == "__main__":
 	elif op == "eddm":
 		#DDM detector
 		fpath = sys.argv[2]
-		bootstrap = len(sys.argv) == 4 and sys.argv[3] == "true"
+		bootstrap = len(sys.argv) >= 4 and sys.argv[3] == "true"
 		evals = getFileColumnAsInt(fpath, 2, ",")
 		detector = SupConceptDrift(0.9)
 		if bootstrap:
-			res = detector.eddm(evals, 700)
+			warmup = int(sys.argv[4])
+			res = detector.eddm(evals, warmup)
 		else:
 			detector.eddmRestore("./model/eddm.mod")
 			res = detector.eddm(evals)
@@ -87,4 +116,20 @@ if __name__ == "__main__":
 			print("{:.3f},{:.3f},{:.3f},{}".format(r[0],r[1],r[2],r[3]))
 		dr = list(map(lambda v: v[3], res))
 		drawLine(dr)
+
+	elif op == "lp":
+		#DDM detector
+		fpath = sys.argv[2]
+		bootstrap = len(sys.argv) >= 4 and sys.argv[3] == "true"
+		evals = getFileAsIntMatrix(fpath, [2,3])
+		detector = SupConceptDrift(0.5)
+		if bootstrap:
+			warmup = int(sys.argv[4])
+			res = detector.lp(evals, warmup)
+		else:
+			detector.lpRestore("./model/lp.mod")
+			res = detector.lp(evals)
+		detector.lpSave("./model/lp.mod")
 		
+	else:
+		exitWithMsg("invalid command")	

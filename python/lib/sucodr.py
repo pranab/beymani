@@ -224,6 +224,51 @@ class SupConceptDrift(object):
 		ws = restoreObject(fpath)
 		self.maxAccRate = ws["maxAccRate"]
 			
+	def lp(self, values, warmUp=0):
+		"""
+		LP algorithm
+		"""
+		result = list()
+		if warmUp > 0:
+			for i in range(warmUp):
+				if ep[0] == 1 and  ep[1] == 0:
+					self.ecount += 1
+				elif ep[0] == 0 and  ep[1] == 1:
+					self.ecount -= 1
+				self.count += 1
+				r = (self.ecount, self.count, 0.0, 0)
+				result.append(r)			
+		else:
+			for i in range(warmUp, len(values), 1):
+				ep = values[i]
+				if ep[0] == 1 and  ep[1] == 0:
+					self.ecount += 1
+				elif ep[0] == 0 and  ep[1] == 1:
+					self.ecount -= 1
+				self.count += 1
+				ediff = self.ecount / self.count
+				dr = 1 if ediff > self.threshold else 0
+				r = (self.ecount, self.count, ediff, dr)
+				result.append(r)			
+				
+		return result
+		
+	def lpSave(self, fpath):
+		"""
+		save DDM algorithm state
+		"""
+		ws = dict()
+		ws["count"] = self.count
+		ws["ecount"] = self.ecount
+		saveObject(ws, fpath)
+			
+	def lpRestore(self, fpath):
+		"""
+		restore DDM algorithm state
+		"""
+		ws = restoreObject(fpath)
+		self.count = ws["count"]
+		self.ecount = ws["ecount"]
 			
 			
 	
