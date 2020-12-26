@@ -131,5 +131,26 @@ if __name__ == "__main__":
 			res = detector.lp(evals)
 		detector.lpSave("./model/lp.mod")
 		
+	elif op == "ecdd":
+		#ECDD detector
+		fpath = sys.argv[2]
+		threshold = float(sys.argv[3])
+		bootstrap = len(sys.argv) >= 5 and sys.argv[4] == "true"
+		evals = getFileColumnAsInt(fpath, 2, ",")
+		detector = SupConceptDrift(threshold)
+		if bootstrap:
+			expf = float(sys.argv[5])
+			warmup = int(sys.argv[6])
+			res = detector.ecdd(evals, expf, warmup)
+		else:
+			detector.ecddRestore("./model/ecdd.mod")
+			res = detector.ecdd(evals, 0.0)
+		detector.ecddSave("./model/ecdd.mod")
+		
+		for r in res:
+			print("{},{:.3f},{}".format(r[0],r[1],r[2]))
+		dr = list(map(lambda v: v[2], res))
+		drawLine(dr)
+
 	else:
 		exitWithMsg("invalid command")	

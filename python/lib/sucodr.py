@@ -48,6 +48,13 @@ class SupConceptDrift(object):
 		self.diSdMax = None
 		self.maxAccRate = None
 		
+		#ECDD
+		self.pr = 0.0
+		self.sd = 0.0
+		self.expf = 0.0
+		self.z = 0.0
+		self.sdz = 0.0
+		
 	def ddm(self, values, warmUp=0):
 		"""
 		DDM algorithm
@@ -270,5 +277,59 @@ class SupConceptDrift(object):
 		self.count = ws["count"]
 		self.ecount = ws["ecount"]
 			
+	def ecdd(self, values, expf, warmUp=0):
+		"""
+		ECDD algorithm
+		"""
+		result = list()
+		if warmUp > 0:
+			self.expf = expf
+			for i in range(warmUp):
+				self.ecddStep(values[i])
+				r = (self.count, self.z, 0)
+				result.append(r)			
+		else:
+			for i in range(warmUp, len(values), 1):
+				self.ecddStep(values[i])
+				bound  = self.pr + self.threshold * self.sdz
+				dr = 1 if self.z > bound else 0
+				r = (self.count, self.z, dr)
+				result.append(r)			
+		return result
+				
+				
+	def ecddStep(self, val):
+		"""
+		ECDD one step exponential forecast
+		"""
+		t = self.count + 1
+		self.pr = (self.count * self.pr) / t + val / t
+		self.sd = self.pr * (1.0 - self.pr)
+		e = 1.0 - self.expf
+		self.sdz = math.sqrt(self.sd * self.expf * (1.0 - e ** (2 * self.count)) / (2.0 - self.expf))
+		self.z = e * self.z + self.expf * val
+		self.count = t
+					
+	def ecddSave(self, fpath):
+		"""
+		save ECDD algorithm state
+		"""
+		ws = dict()
+		ws["count"] = self.count
+		ws["pr"] = self.pr
+		ws["expf"] = self.expf
+		ws["z"] = self.z
+		saveObject(ws, fpath)
+				
+	def ecddRestore(self, fpath):
+		"""
+		restore DDM algorithm state
+		"""
+		ws = restoreObject(fpath)
+		self.count = ws["count"]
+		self.pr = ws["pr"]
+		self.expf = ws["expf"]
+		wself.z = s["z"]
+		
 			
 	
