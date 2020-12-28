@@ -331,5 +331,31 @@ class SupConceptDrift(object):
 		self.expf = ws["expf"]
 		wself.z = s["z"]
 		
-			
-	
+	def aggregateDrift(self, values, consensus):
+		"""
+		Aggregates multiple drift results 
+		"""
+		result = list()	
+		for r in values:
+			count = 0
+			for v in r:
+				if v == 1:
+					count += 1
+			dr = 1 if count >= consensus else 0
+			result.append(dr)
+		return result
+					
+	def anyDrift(self, values):
+		"""
+		AND aggregate drift 
+		"""
+		return self.aggregateDrift(values, 1)
+					
+	def allDrift(self, values):
+		"""
+		AND aggregate drift 
+		"""
+		dcount = len(values[0])
+		return self.aggregateDrift(values, dcount)
+		
+

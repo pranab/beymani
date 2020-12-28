@@ -38,3 +38,9 @@ Detect drift
 ./codrift.py eddm er2.txt
 In our case drift will be detected, because about half way through the error data, the error rate dobles
 to simulate drift. For real prouction data, you may or may not find drift
+
+Ensemble and hierarchy of drift detectors
+=========================================
+There are aggregate functions in sucodr.py, that can be used to implement ensemble of detector e.g.
+LFR
+
