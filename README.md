@@ -1,6 +1,6 @@
 ## Introduction
 Beymani consists of set of Hadoop, Spark and Storm based tools for outlier and anamoly 
-detection, which can be used for fraud detection, intrusion detection. 
+detection, which can be used for fraud detection, intrusion detection etc.
 
 ## Philosophy
 * Simple to use
@@ -19,6 +19,7 @@ The following blogs of mine are good source of details of beymani
 * https://pkghosh.wordpress.com/2018/10/15/learning-alarm-threshold-from-user-feedback-using-decision-tree-on-spark/
 * https://pkghosh.wordpress.com/2019/07/25/time-series-sequence-anomaly-detection-with-markov-chain-on-spark/
 * https://pkghosh.wordpress.com/2020/09/27/time-series-change-point-detection-with-two-sample-statistic-on-spark-with-application-for-retail-sales-data/
+* https://pkghosh.wordpress.com/2020/12/24/concept-drift-detection-techniques-with-python-implementation-for-supervised-machine-learning-models/
 
 ## Algorithms
 * Univarite  distribution model
