@@ -23,20 +23,27 @@ import statistics
 import matplotlib.pyplot as plt 
 sys.path.append(os.path.abspath("../lib"))
 sys.path.append(os.path.abspath("../mlextra"))
+sys.path.append(os.path.abspath("../unsupv"))
 from util import *
 from sampler import *
+from ae import *
 
 """
-data generation for service ticket consisting ticket ID, severity, prority, service time in hour
+data generation for service ticket 
 """
+
+
 if __name__ == "__main__":
 	op = sys.argv[1]
 	if op == "gen":
+		"""
+		data generation for service ticket consisting ticket ID, severity, prority, service time in hour
+		"""
 		numSamp = int(sys.argv[2])
 		
 		scIds = ["JDG34JHD3H", "TK80SDH6N2"]
 		
-		#service time distribution based on severity and priority
+		#service time in hour distribution based on severity and priority
 		distr = dict()
 		sePr = (1,1)
 		distr[sePr] = NonParamRejectSampler(2, 8, 80, 100, 50, 10, 5)
@@ -70,6 +77,80 @@ if __name__ == "__main__":
 			print("{},{},{},{},{}".format(scIds[sci],tid, sev, pri, stime))
 			tids[sci] += 1
 			
+	elif op == "genx":
+		"""
+		data generation for service ticket consisting ticket ID, severity, prority, num of calls, 
+		num of messages and emails, customer sentiment, reopened or not
+		"""
+		numSamp = int(sys.argv[2])
+		
+		#service time distribution in days based on severity and priority
+		tmDistr = dict()
+		sePr = (1,1)
+		tmDistr[sePr] = NonParamRejectSampler(1, 1, 80, 100, 50, 10, 5)
+		sePr = (2,1)
+		tmDistr[sePr] = NonParamRejectSampler(1, 1, 30, 60, 80, 100, 60, 40, 10)
+		sePr = (3,1)
+		tmDistr[sePr] = NonParamRejectSampler(1, 1, 10, 40, 60, 80, 90, 100, 95, 80, 60, 40, 25, 5)
+		
+		sePr = (1,2)
+		tmDistr[sePr] = NonParamRejectSampler(1, 1, 100, 70, 40, 10, 5)
+		sePr = (2,2)
+		tmDistr[sePr] = NonParamRejectSampler(1, 1, 45, 70, 100, 60, 40, 25, 5)
+		sePr = (3,2)
+		tmDistr[sePr] = NonParamRejectSampler(1, 1, 30, 60, 75, 90, 100, 90, 80, 70, 50, 25, 10)
+		
+		sevDistr = DiscreteRejectSampler(1, 3, 1, 70, 100, 40)
+		priDistr = DiscreteRejectSampler(1, 2, 1, 100, 30)
+		
+		#num of call distribution based on severity
+		ncallDistr = dict()
+		ncallDistr[1] = NormalSampler(1.2, 0.5)
+		ncallDistr[2] = NormalSampler(2.5, 1.4)
+		ncallDistr[3] = NormalSampler(4.5, 2.0)
+
+		#num of call distribution based on severity
+		nmsgDistr = dict()
+		nmsgDistr[1] = NormalSampler(0.7, 0.5)
+		nmsgDistr[2] = NormalSampler(1.2, 0.9)
+		nmsgDistr[3] = NormalSampler(2.2, 1.4)
+		
+		#sentiment
+		sentDistr = dict()
+		sentDistr[1] = NonParamRejectSampler(-1.0, .5, 20, 35, 100, 60, 25)
+		sentDistr[2] = NonParamRejectSampler(-1.0, .5, 30, 50, 100, 40, 15)
+		sentDistr[3] = NonParamRejectSampler(-1.0, .5, 40, 70, 100, 30, 10)
+		for s in sentDistr.values():
+			s.sampleAsFloat()
+
+		#reopen
+		reopenDistr = dict()
+		reopenDistr[1] = BernoulliTrialSampler(0.10)
+		reopenDistr[2] = BernoulliTrialSampler(0.20)
+		reopenDistr[3] = BernoulliTrialSampler(0.35)
+
+		for _ in range(numSamp):
+			tid = genID(10) 
+			sev = sevDistr.sample()
+			pri = priDistr.sample()
+			x = (sev, pri)
+			stime = int(tmDistr[x].sample())
+			ncall = int(ncallDistr[sev].sample())
+			ncall = minLimit(ncall, 1)
+			nmsg = int(nmsgDistr[sev].sample())
+			nmsg = minLimit(nmsg, 0)
+			sent = sentDistr[sev].sample()
+			reopen =  1 if reopenDistr[sev].sample() else 0
+			if reopen == 1:
+				stime = int(0.9 * stime)
+				ncall -= 1
+				ncall = minLimit(ncall, 1)
+				nmsg -= 1
+				nmsg = minLimit(nmsg, 0)
+			stime = minLimit(stime, 1)	
+			print("{},{},{},{},{},{:.2f},{},{}".format(tid, sev, pri, ncall, nmsg, sent, reopen, stime))
+			
+			
 	elif op == "iol":
 		filePath = sys.argv[2]
 		olRate = int(sys.argv[3])
@@ -84,6 +165,12 @@ if __name__ == "__main__":
 			print(mrec)
 			
 				 		
+	elif op == "train":
+		prFile = sys.argv[2]
+		auenc = AutoEncoder(prFile)
+		auenc.buildModel()
+		auenc.trainModel()
 		
-		
+	else:
+		exitWithMsg("invalid command")	
 		
