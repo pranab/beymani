@@ -76,6 +76,19 @@ if __name__ == "__main__":
 				stime = int(1.2 * stime + 4)
 			print("{},{},{},{},{}".format(scIds[sci],tid, sev, pri, stime))
 			tids[sci] += 1
+
+	elif op == "iol":
+		filePath = sys.argv[2]
+		olRate = int(sys.argv[3])
+		for rec in fileRecGen(filePath, ","):
+			if isEventSampled(olRate):
+				svcTm = int(rec[4])
+				osvcTm = svcTm + random.randint(30, 50)
+				if osvcTm > 3 * svcTm:
+					osvcTm = 3 * svcTm
+				rec[4] = str(osvcTm)
+			mrec = ",".join(rec)
+			print(mrec)
 			
 	elif op == "genx":
 		"""
@@ -150,27 +163,49 @@ if __name__ == "__main__":
 			stime = minLimit(stime, 1)	
 			print("{},{},{},{},{},{:.2f},{},{}".format(tid, sev, pri, ncall, nmsg, sent, reopen, stime))
 			
-			
-	elif op == "iol":
+
+	elif op == "iolx":
 		filePath = sys.argv[2]
 		olRate = int(sys.argv[3])
+		atypeDistr = DiscreteRejectSampler(1, 3, 1, 100, 40, 30)
 		for rec in fileRecGen(filePath, ","):
 			if isEventSampled(olRate):
-				svcTm = int(rec[4])
-				osvcTm = svcTm + random.randint(30, 50)
-				if osvcTm > 3 * svcTm:
-					osvcTm = 3 * svcTm
-				rec[4] = str(osvcTm)
+				atype = atypeDistr.sample()
+				if atype == 1:
+					#service time
+					svcTm = int(rec[7])
+					osvcTm = svcTm + random.randint(1, 5)
+					rec[7] = str(osvcTm)
+				elif atype == 2:
+					#num of calls
+					ncall = int(rec[3])
+					ncall += random.randint(2, 5)
+					rec[3] = str(ncall)
+				elif atype == 3:
+					#sentiment
+					sent = float(rec[5])
+					sent -= randomFloat(.2, .5)
+					sent = minLimit(sent, -1.0)
+					rec[5] = "{:.2f}".format(sent)
+				
 			mrec = ",".join(rec)
 			print(mrec)
-			
-				 		
+							 		
 	elif op == "train":
 		prFile = sys.argv[2]
 		auenc = AutoEncoder(prFile)
 		auenc.buildModel()
 		auenc.trainModel()
 		
+	elif op == "regen":
+		prFile = sys.argv[2]
+		auenc = AutoEncoder(prFile)
+		auenc.buildModel()
+		scores = auenc.regen()
+		plt.hist(scores, bins=30, cumulative=False, density=False)
+		plt.show()
+		print(sorted(scores, reverse=True)[:20])
+
 	else:
 		exitWithMsg("invalid command")	
 		
