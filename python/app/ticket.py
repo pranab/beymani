@@ -168,6 +168,7 @@ if __name__ == "__main__":
 		filePath = sys.argv[2]
 		olRate = int(sys.argv[3])
 		atypeDistr = DiscreteRejectSampler(1, 3, 1, 100, 40, 30)
+		orecs = list()
 		for rec in fileRecGen(filePath, ","):
 			if isEventSampled(olRate):
 				atype = atypeDistr.sample()
@@ -187,7 +188,12 @@ if __name__ == "__main__":
 					sent -= randomFloat(.2, .5)
 					sent = minLimit(sent, -1.0)
 					rec[5] = "{:.2f}".format(sent)
+				orecs.append(rec)
 				
+			with open("ol.txt", "w") as olFile:
+				for r in orecs:
+					olFile.write(",".join(r) + "\n")
+					
 			mrec = ",".join(rec)
 			print(mrec)
 							 		
@@ -201,10 +207,14 @@ if __name__ == "__main__":
 		prFile = sys.argv[2]
 		auenc = AutoEncoder(prFile)
 		auenc.buildModel()
-		scores = auenc.regen()
-		plt.hist(scores, bins=30, cumulative=False, density=False)
-		plt.show()
-		print(sorted(scores, reverse=True)[:20])
+		recs = auenc.regen()
+		#plt.hist(scores, bins=30, cumulative=False, density=False)
+		#plt.show()
+		skey = lambda r : float(r.split(",")[8])
+		sr = sorted(recs, key=skey, reverse=True)[:50]
+		printList(sr)
+		ss = list(map(lambda r : float(r.split(",")[8]), sr))
+		drawLine(ss)
 
 	else:
 		exitWithMsg("invalid command")	
