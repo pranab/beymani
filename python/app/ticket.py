@@ -167,7 +167,7 @@ if __name__ == "__main__":
 	elif op == "iolx":
 		filePath = sys.argv[2]
 		olRate = int(sys.argv[3])
-		atypeDistr = DiscreteRejectSampler(1, 3, 1, 100, 40, 30)
+		atypeDistr = DiscreteRejectSampler(1, 3, 1, 100, 30, 20)
 		orecs = list()
 		for rec in fileRecGen(filePath, ","):
 			if isEventSampled(olRate):
@@ -175,12 +175,12 @@ if __name__ == "__main__":
 				if atype == 1:
 					#service time
 					svcTm = int(rec[7])
-					osvcTm = svcTm + random.randint(1, 5)
-					rec[7] = str(osvcTm)
+					svcTm += random.randint(4, 8)
+					rec[7] = str(svcTm)
 				elif atype == 2:
 					#num of calls
 					ncall = int(rec[3])
-					ncall += random.randint(2, 5)
+					ncall += random.randint(3, 6)
 					rec[3] = str(ncall)
 				elif atype == 3:
 					#sentiment
@@ -189,14 +189,14 @@ if __name__ == "__main__":
 					sent = minLimit(sent, -1.0)
 					rec[5] = "{:.2f}".format(sent)
 				orecs.append(rec)
-				
-			with open("ol.txt", "w") as olFile:
-				for r in orecs:
-					olFile.write(",".join(r) + "\n")
 					
 			mrec = ",".join(rec)
 			print(mrec)
 							 		
+		with open("aol.txt", "w") as aol:
+			for r in orecs:
+				aol.write(",".join(r) + "\n")
+				
 	elif op == "train":
 		prFile = sys.argv[2]
 		auenc = AutoEncoder(prFile)
@@ -211,11 +211,25 @@ if __name__ == "__main__":
 		#plt.hist(scores, bins=30, cumulative=False, density=False)
 		#plt.show()
 		skey = lambda r : float(r.split(",")[8])
-		sr = sorted(recs, key=skey, reverse=True)[:50]
-		printList(sr)
+		sr = sorted(recs, key=skey, reverse=True)
+		#printList(sr)
+		with open("rol.txt", "w") as rol:
+			for r in sr:
+				rol.write(r + "\n")
+		
 		ss = list(map(lambda r : float(r.split(",")[8]), sr))
 		drawLine(ss)
 
+	elif op == "fout":
+		rfile = sys.argv[2]
+		ofile = sys.argv[3]
+		roul = getFileColumnAsString(rfile, 0)
+		aoul = getFileColumnAsString(ofile, 0)
+		
+		for k in aoul:
+			i = roul.index(k)
+			print(k, i)
+		
 	else:
 		exitWithMsg("invalid command")	
 		
