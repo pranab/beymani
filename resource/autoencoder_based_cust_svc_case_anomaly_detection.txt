@@ -1,0 +1,66 @@
+This tutorial is for anaomaly detection for service time for an issue processing system  data using 
+auto encoder. 
+ 
+
+Environment
+===========
+Path etc shown here corresposnds to my environment. Please Change them  as needed  for your 
+environment
+
+
+Python dependency
+=================
+The shell script commands for data generation run python scripts for data generation. Before you run 
+the data generation commands do the following
+1. checkout project avenir
+2. copy the directories  avenir/python/lib  avenir/python/mlextra and avenir/python/unsup directory to ../lib 
+../mlextra and ../unsup with respect to your location of cpu_usage.py file
+
+
+Create normal data for modeling
+===============================
+./ticket.py genx <num_issues> > cus_tr.txt
+
+where
+num_issues = number of issues e.g 2000
+
+
+Create test data
+================
+./ticket.py genx <num_issues> > cus.txt
+where
+num_issues = number of issues e.g 200
+
+insert outliers
+/ticket.py iolx  cus.txt <outlier_percentage> > cus_te.txt
+
+where
+<outlier_percentage = outlier percentage e.g 10
+
+Train Auto Encoder
+==================
+ ./ticket.py train  ae_ticket.properties
+ Make sure the following are set
+ train.model.save=True
+ 
+ Model hyper parameters are tuned manually. Feel free to change and experiment by editing the file
+ ae_ticket.properties
+ 
+ Test for regeneration error
+ ===========================
+ ./ticket.py regen ae_ticket.properties
+ A file called rol.txt has the output
+ 
+ Regeneration error upper tail stat
+ ==================================
+ ./ticket.py utstat  rol.txt
+ 
+ Histogram of regeneration error
+ ===============================
+ ./ticket.py hist  rol.txt
+ 
+ 
+ 
+ 
+ 
+ 

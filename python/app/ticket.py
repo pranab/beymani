@@ -27,6 +27,8 @@ sys.path.append(os.path.abspath("../unsupv"))
 from util import *
 from sampler import *
 from ae import *
+from daexp import *
+from mcsim import *
 
 """
 data generation for service ticket 
@@ -220,6 +222,22 @@ if __name__ == "__main__":
 		ss = list(map(lambda r : float(r.split(",")[8]), sr))
 		drawLine(ss)
 
+	elif op == "hist":
+		rfile = sys.argv[2]
+		exp = DataExplorer()
+		exp.addFileNumericData(rfile, 8, "rerror")
+		exp.plotHist("rerror", True, True)
+		
+	elif op == "utstat":
+		rfile = sys.argv[2]
+		vl = getFileColumnAsFloat(rfile, 8)
+		sim = MonteCarloSimulator(None,None,None,None)	
+		sim.setOutput(vl)
+		stats = sim.getUpperTailStat(0)
+		for s in stats:
+			print("{:.3f} {:.3f}".format(s[0], s[1]))
+		
+		
 	elif op == "fout":
 		rfile = sys.argv[2]
 		ofile = sys.argv[3]
