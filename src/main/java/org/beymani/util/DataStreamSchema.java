@@ -21,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.chombo.util.BasicUtils;
@@ -70,12 +71,45 @@ public class DataStreamSchema implements Serializable {
 	 * @param type
 	 * @return
 	 */
+	public List<DataStream> findAllByType(String type) {
+		List<DataStream> streams = new ArrayList<DataStream>();
+		for (DataStream daStrm : dataStreams) {
+			if (daStrm.getType().equals(type)) {
+				streams.add(daStrm);
+			}
+		}	
+		return streams;
+	}
+
+	/**
+	 * @param type
+	 * @return
+	 */
 	public DataStream findByTypeAndId(String type, String id) {
 		DataStream stream = null;
 		for (DataStream daStrm : dataStreams) {
-			if (daStrm.getType().equals(type) && daStrm.getId().equals(id)) {
-				stream = daStrm;
-				break;
+			if (daStrm.getId().equals("*")) {
+				if (daStrm.getType().equals(type)) {
+					boolean done = false;
+					List<DataStream> parents = findAllByType(daStrm.getParentType());
+					for (DataStream pa : parents) {
+						List<String> children = pa.getChildrenId();
+						BasicUtils.assertNotNull(children, "missing child ID list in parent");
+						if (children.contains(id)) {
+							BasicUtils.assertCondition(daStrm.getParentId().equals(pa.getId()), "mismatched parent ID");
+							stream = daStrm;
+							done = true;
+							break;
+						}
+					}
+					if (done)
+						break;
+				}
+			} else {
+				if (daStrm.getType().equals(type) && daStrm.getId().equals(id)) {
+					stream = daStrm;
+					break;
+				}
 			}
 		}	
 		return stream;
