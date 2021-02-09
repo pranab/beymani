@@ -1,0 +1,139 @@
+This tutorial is for ecommerce retail sale monitring  based anomaly detection for hourly sales data.
+Robust zscore is used  for anomaly detection. The data hierarchy is org -> sale -> dept -> product sale
+
+Dependent script
+================
+Checkout the project avenir. Copy the lib  directory under python to a directory  at the same level
+as your working directory for python script ecomm.py
+
+Build and Deployment
+====================
+Please refer to resorce/spark_dependency.txt for building all jars and the final uber jar filw
+
+Script and configuration
+========================
+Feel free to make changes in script exp_spark.sh and the configuration file exp.conf as per you
+environment
+
+Generate stats for hourly sales
+===============================
+./ecomm.py <num_product> > prstat.txt
+
+where
+num_product = num of products e.g 20
+
+Generate training data
+======================
+./ecomm.py prstat.txt <interval> d > sale_tr.txt
+
+where
+interval = num of days in past e.g 30
+
+Generate prediction data
+========================
+./ecomm.py prSale prstat.txt <interval> d > sale.txt
+
+where
+interval = num of days in past e.g 2
+
+Insert outlier
+./ecomm.py olPrSale sale.txt <outlier_percentage> > sale_pr.txt
+
+where
+outlier_percentage = percentage of outliers e.g 10
+
+Copy training data
+==================
+./ecomm.sh loadInp sale_tr.txt training
+
+Run spark job for basic stats
+=============================
+./ecomm.sh numStat 
+
+Run spark job for median
+========================
+Set the following in ecomm.conf for numericalAttrMedian
+operation.type = "med"
+
+Run
+./ecomm.sh numMstat
+
+Copy median file
+================
+./ecomm.sh bkMod med.txt
+
+Run spark job for median absolute deviation
+===========================================
+Set the following in ecomm.conf for numericalAttrMedian
+operation.type = "mad"
+
+Run
+./ecomm.sh numMstat
+
+Copy median absolute deviation file
+===================================
+./ecomm.sh bkMod mad.txt
+
+
+Copy prediction data
+====================
+./ecomm.sh loadInp sale_pr.txt pred
+
+Run spark job for prediction
+============================
+./ecomm.sh olPred
+
+Copy prediction output into one file
+====================================
+./ecomm.sh bkOut psale/olp.txt
+
+Run spark job to aggregate to dept
+==================================
+Clean aggregator input dir
+./ecomm.sh rmAggrInp
+
+Copy to aggregator input dir
+./ecomm.sh loadAggrInp psale/olp.txt
+
+Run aggregator
+./ecomm.sh aggrOl
+
+Copy aggregator output into one file
+./ecomm.sh bkOutAggr dept/olp.txt
+
+Run spark job to aggregate to sale
+==================================
+Clean aggregator input dir
+./ecomm.sh rmAggrInp
+
+Copy to aggregator input dir
+./ecomm.sh loadAggrInp dept/olp.txt
+
+Run aggregator
+./ecomm.sh aggrOl
+
+Copy aggregator output into one file
+./ecomm.sh bkOutAggr sale/olp.txt
+
+Run spark job to aggregate to organization
+==========================================
+Clean aggregator input dir
+./ecomm.sh rmAggrInp
+
+Copy to aggregator input dir
+./ecomm.sh loadAggrInp sale/olp.txt
+
+Run aggregator
+./ecomm.sh aggrOl
+
+Copy aggregator output into one file
+./ecomm.sh bkOutAggr org/olp.txt
+
+
+
+
+
+
+
+
+

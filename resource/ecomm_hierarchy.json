@@ -1,0 +1,49 @@
+{
+	"dataStreams" :
+	[
+		{
+			"id" : "corp",
+			"type" : "root",
+			"parentId" : "none",
+			"parentType" : "none",
+			"singleton" : true
+		},
+		{
+			"id" : "sale",
+			"type" : "sale",
+			"parentId" : "root",
+			"parentType" : "root",
+			"singleton" : true
+		},
+		{
+			"id" : "electronics",
+			"type" : "dept",
+			"parentId" : "sale",
+			"parentType" : "sale",
+			"singleton" : false,
+			"childrenId" : ["31W6CN4OGP","ATROK5G187","54RLEB9L5J","P3N63F2TPP","L674KMOI01","38A2F7U4XK","L0668572D0","BS6RHF2PV2","C88L3DYBB9","NX23WR8JJW"]
+		},
+		{
+			"id" : "clothing",
+			"type" : "dept",
+			"parentId" : "sale",
+			"parentType" : "sale",
+			"singleton" : false,
+			"childrenId" : ["IYZN3F9WCX","2DPXUFR93R","7MRHFY4L70","3FHQOJ45IJ","H4T8785L41","P3RVWCZS37","GZ4819T12I","OGX2037784","9021SDZ1O6","U62K213GI2"]
+		},
+		{
+			"id" : "*",
+			"type" : "prodSale",
+			"parentId" : "electronics",
+			"parentType" : "dept",
+			"singleton" : false
+		},
+		{
+			"id" : "*",
+			"type" : "prodSale",
+			"parentId" : "clothing",
+			"parentType" : "dept",
+			"singleton" : false
+		}	
+	]
+}

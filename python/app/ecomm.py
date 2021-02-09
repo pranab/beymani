@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python3
 
 # avenir-python: Machine Learning
 # Author: Pranab Ghosh
@@ -49,7 +49,7 @@ if __name__ == "__main__":
 			msZip = list(map(lambda p: p[0] + "," + p[1], zip(dailySeasMeanStr, dailySeasStdDevStr)))	
 			ms = ",".join(msZip)
 			id = genID(10)
-			print "%s,%s" %(id,ms)
+			print("{},{}".format(id,ms))
 			
 	#generate sales data		
 	elif op == "prSale":
@@ -85,7 +85,7 @@ if __name__ == "__main__":
 				quant = sampler.sample()
 				total = int(quant)
 				total =  minLimit(total, 0)
-				print "prodSale,%s,%d,%d" %(pid,sTime,total)  
+				print("prodSale,{},{},{}".format(pid,sTime,total))
 			sTime += sIntv
 
 	#insert outliers in sales data		
@@ -105,7 +105,7 @@ if __name__ == "__main__":
 				count += 1
 				rec[3] = str(quant)
 			mrec = ",".join(rec)
-			print mrec
+			print(mrec)
 		#print count
 	
 	#generate abandoned shopping cart data		
@@ -119,7 +119,7 @@ if __name__ == "__main__":
 		sIntv = secInHour
 		while sTime < cTime:
 			quant = int(scDistr.sample())
-			print "scAbandon,scAbandon,%d,%d" %(sTime,quant)  
+			print("scAbandon,scAbandon,{},{}".format(sTime,quant))
 			sTime += sIntv
 
 	#insert outliers in abandoned shopping cart data	
@@ -133,8 +133,8 @@ if __name__ == "__main__":
 				count += 1
 				rec[3] = str(quant)
 			mrec = ",".join(rec)
-			print mrec
-		print count
+			print(mrec)
+		print(count)
 	
 	##make timestamp current	
 	elif op == "updTm":
@@ -154,6 +154,6 @@ if __name__ == "__main__":
 			tm += tmDiff
 			rec[2] = str(tm)
 			mrec = ",".join(rec)
-			print mrec
+			print(mrec)
 			
 			
