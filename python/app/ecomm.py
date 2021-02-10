@@ -72,6 +72,7 @@ if __name__ == "__main__":
 		
 		(cTime, pTime) = pastTime(interval, sys.argv[4])
 		pTime = hourAlign(pTime)
+		cTime = hourAlign(cTime)
 		sTime = pTime
 		sIntv = secInHour
 		#print pTime, cTime

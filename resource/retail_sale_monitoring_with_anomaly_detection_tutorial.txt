@@ -17,24 +17,23 @@ environment
 
 Generate stats for hourly sales
 ===============================
-./ecomm.py <num_product> > prstat.txt
+./ecomm.py prStat <num_product> > prstat.txt
 
 where
 num_product = num of products e.g 20
 
 Generate training data
 ======================
-./ecomm.py prstat.txt <interval> d > sale_tr.txt
+./ecomm.py prSale prstat.txt <interval> <time_unit> > sale_tr.txt
 
 where
 interval = num of days in past e.g 30
+time_unit = time unit d for day and h for hour
 
 Generate prediction data
 ========================
-./ecomm.py prSale prstat.txt <interval> d > sale.txt
+./ecomm.py prSale prstat.txt <interval> <time_unit> > sale.txt
 
-where
-interval = num of days in past e.g 2
 
 Insert outlier
 ./ecomm.py olPrSale sale.txt <outlier_percentage> > sale_pr.txt
