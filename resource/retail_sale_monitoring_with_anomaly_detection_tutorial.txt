@@ -27,7 +27,7 @@ Generate training data
 ./ecomm.py prSale prstat.txt <interval> <time_unit> > sale_tr.txt
 
 where
-interval = num of days in past e.g 30
+interval = amount of time into past e.g 30
 time_unit = time unit d for day and h for hour
 
 Generate prediction data
