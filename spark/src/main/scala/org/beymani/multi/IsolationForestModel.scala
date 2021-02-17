@@ -27,14 +27,14 @@ import scala.collection.mutable.ArrayBuffer
 import org.beymani.spark.common.OutlierUtility
 import org.chombo.util.BasicUtils
 
-object IsolationForestDetector extends JobConfiguration with GeneralUtility with OutlierUtility  {
+object IsolationForestModel extends JobConfiguration with GeneralUtility with OutlierUtility  {
   
    /**
     * @param args
     * @return
     */
    def main(args: Array[String]) {
-	   val appName = "IiolationForestDetector"
+	   val appName = "isolationForestModel"
 	   val Array(inputPath: String, outputPath: String, configFile: String) = getCommandLineArgs(args, 3)
 	   val config = createConfig(configFile)
 	   val sparkConf = createSparkConf(appName, config, false)
@@ -52,6 +52,7 @@ object IsolationForestDetector extends JobConfiguration with GeneralUtility with
 	   val defMaxDepth = Math.log(subsampleSize).toInt
 	   val maxDepth = getIntParamOrElse(appConfig, "max.depth", defMaxDepth);
 	   val countFilePath = getMandatoryStringParam(appConfig, "count.filePath", "missing per key record count file")	
+	   val modelFilePath = getOptionalStringParam(appConfig, "mod.filePath")	
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3);
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
@@ -172,6 +173,15 @@ object IsolationForestDetector extends JobConfiguration with GeneralUtility with
 	     }).filter(r => r._2).count()
 	     
 	     done = interNodeCount == 0
+	   }
+	   
+	   //save model
+	   modelFilePath match {
+	     case Some(filePath) => {
+	       trPathRecs.cache
+	       trPathRecs.keys.saveAsTextFile(filePath) 
+	     }
+	     case None =>
 	   }
 
 	   //key by ID
