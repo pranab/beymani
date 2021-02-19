@@ -15,7 +15,7 @@
  * permissions and limitations under the License.
  */
 
-package org.beymani.knn
+package org.beymani.spark.knn
 
 import scala.math.max
 import org.apache.spark.SparkContext

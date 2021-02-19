@@ -15,7 +15,7 @@
  * permissions and limitations under the License.
  */
 
-package org.beymani.multi
+package org.beymani.spark.multi
 
 import scala.collection.JavaConverters._
 import org.apache.spark.SparkContext
