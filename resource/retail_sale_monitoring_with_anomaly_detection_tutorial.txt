@@ -61,6 +61,8 @@ Copy median file
 ================
 ./ecomm.sh bkMod med.txt
 
+It generates med.txt file
+
 Run spark job for median absolute deviation
 ===========================================
 Set the following in ecomm.conf for numericalAttrMedian
@@ -73,6 +75,7 @@ Copy median absolute deviation file
 ===================================
 ./ecomm.sh bkMod mad.txt
 
+It generates mad.txt
 
 Copy prediction data
 ====================
@@ -86,6 +89,8 @@ Copy prediction output into one file
 ====================================
 ./ecomm.sh bkOut psale/olp.txt
 
+All output gets wrirtten to olp.txt
+
 Run spark job to aggregate to dept
 ==================================
 Clean aggregator input dir
@@ -94,7 +99,7 @@ Clean aggregator input dir
 Copy to aggregator input dir
 ./ecomm.sh loadAggrInp psale/olp.txt
 
-Run aggregator
+Run aggregator spark job
 ./ecomm.sh aggrOl
 
 Copy aggregator output into one file

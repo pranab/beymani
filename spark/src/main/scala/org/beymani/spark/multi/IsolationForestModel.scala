@@ -175,11 +175,12 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	     done = interNodeCount == 0
 	   }
 	   
-	   //save model
+	   //save model including sub population count for the path
 	   modelFilePath match {
 	     case Some(filePath) => {
-	       trPathRecs.cache
-	       trPathRecs.keys.saveAsTextFile(filePath) 
+	       val trPathWithCnt = trPathRecs.map(r => {(r._1, 1)}).reduceByKey((v1, v2) => {v1 + v2}).
+	         map(r => {r._1.toString(fieldDelimOut) + fieldDelimOut + r._2})
+	       trPathWithCnt.saveAsTextFile(filePath) 
 	     }
 	     case None =>
 	   }
