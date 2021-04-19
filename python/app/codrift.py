@@ -23,9 +23,11 @@ import statistics
 import matplotlib.pyplot as plt 
 sys.path.append(os.path.abspath("../lib"))
 sys.path.append(os.path.abspath("../mlextra"))
+sys.path.append(os.path.abspath("../supv"))
 from util import *
 from sampler import *
 from sucodr import *
+from knn import *
 
 """
 concept drift data generation nd driver
@@ -160,6 +162,7 @@ if __name__ == "__main__":
 		numSample = int(sys.argv[2])
 		noise = float(sys.argv[3])
 		
+		cids = None
 		if len(sys.argv) == 5:
 			rfPath = sys.argv[4]
 			cids = getFileColumnAsString(rfPath, 0)
@@ -255,27 +258,39 @@ if __name__ == "__main__":
 		fpath = sys.argv[2]
 		for rec in fileRecGen(fpath, ","):
 			fi = 1
-			tran = linTrans(float(rec[fi]), 1.21, 30)
+			tran = linTrans(float(rec[fi]), 1.1, 30)
 			rec[fi] = tran
 			fi += 1
-			ga = int(linTrans(int(rec[fi]), 0.95, -7))
+			ga = int(linTrans(int(rec[fi]), 0.95, -6))
 			rec[fi] = ga
 			fi += 1
-			du = int(linTrans(int(rec[fi]), 1.4, 200))
+			du = int(linTrans(int(rec[fi]), 1.2, 120))
 			rec[fi] = du
 			fi += 1
-			srch = int(linTrans(int(rec[fi]), 1.3, 4))
+			srch = int(linTrans(int(rec[fi]), 1.3, 2))
 			rec[fi] = srch
 			fi += 1
 			issue = int(linTrans(int(rec[fi]), 1, 1))
 			rec[fi] = issue
 			fi += 2
-			pissue = int(linTrans(int(rec[fi]), 1, 2))
+			pissue = int(linTrans(int(rec[fi]), 1, 1))
 			rec[fi] = pissue
 			r = toStrFromList(rec, 2)
 			print(r)
 		
-
-	
+	elif op == "udrift":
+		#unsupervised drift detection with knn classifier
+		cfPath = sys.argv[2]
+		knnClass = NearestNeighbor(cfPath)
+		knnClass.train()
+		cres = knnClass.predictProb()
+		prl = list()
+		for r in cres:
+			pr = r[0] if r[0] > r[1] else r[1]
+			prl.append(pr)
+			print(r)
+		mpr = statistics.mean(prl)	
+		print("mean prediction probability {:.3f}".format(mpr))
+		
 	else:
 		exitWithMsg("invalid command")	
