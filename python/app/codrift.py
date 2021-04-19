@@ -31,6 +31,9 @@ from sucodr import *
 concept drift data generation nd driver
 """
 
+def linTrans(val, scale, shift):
+	return val * scale + shift
+	
 if __name__ == "__main__":
 	op = sys.argv[1]
 	if op == "agen":
@@ -152,5 +155,127 @@ if __name__ == "__main__":
 		dr = list(map(lambda v: v[2], res))
 		drawLine(dr)
 
+	elif op == "genrc":
+		#generate retail churn data
+		numSample = int(sys.argv[2])
+		noise = float(sys.argv[3])
+		
+		if len(sys.argv) == 5:
+			rfPath = sys.argv[4]
+			cids = getFileColumnAsString(rfPath, 0)
+		
+		classes = ["1", "0"]
+		chDistr = CategoricalRejectSampler(("1", 30), ("0", 70))
+		featCondDister = {}
+		
+		#trans amount
+		fi = 0
+		key = ("1", fi)
+		distr = NormalSampler(50, 10)
+		featCondDister[key] = distr
+		key = ("0", fi)
+		distr = NormalSampler(150, 15)
+		featCondDister[key] = distr
+		
+		#average num days gap
+		fi += 1
+		key = ("1", fi)
+		distr = NormalSampler(30, 10)
+		featCondDister[key] = distr
+		key = ("0", fi)
+		distr = NormalSampler(15, 5)
+		featCondDister[key] = distr
+		
+		#avearge visit duration sec
+		fi += 1
+		key = ("1", fi)
+		distr = NormalSampler(600, 120)
+		featCondDister[key] = distr
+		key = ("0", fi)
+		distr = NormalSampler(1200, 180)
+		featCondDister[key] = distr
+		
+		#avearge num searches
+		fi += 1
+		key = ("1", fi)
+		distr = DiscreteRejectSampler(1, 3, 1, 100, 50, 20)
+		featCondDister[key] = distr
+		key = ("0", fi)
+		distr = DiscreteRejectSampler(1, 4, 1, 70, 100, 80, 50)
+		featCondDister[key] = distr
+		
+		#avearge num of customer issues
+		fi += 1
+		key = ("1",fi)
+		distr = DiscreteRejectSampler(1, 6, 1, 60, 80, 100, 90, 70, 40)
+		featCondDister[key] = distr
+		key = ("0", fi)
+		distr = DiscreteRejectSampler(1, 2, 1, 100, 40)
+		featCondDister[key] = distr
+		
+		#avearge num calls for resolution
+		fi += 1
+		key = ("1", fi)
+		distr = DiscreteRejectSampler(1, 3, 1, 40, 100, 20)
+		featCondDister[key] = distr
+		key = ("0", fi)
+		distr = DiscreteRejectSampler(1, 2, 1, 100, 50)
+		featCondDister[key] = distr
+
+		#avearge num payment problems
+		fi += 1
+		key = ("1", fi)
+		distr = DiscreteRejectSampler(1, 3, 1, 40, 60, 100)
+		featCondDister[key] = distr
+		key = ("0", fi)
+		distr = DiscreteRejectSampler(0, 1, 1, 100, 70)
+		featCondDister[key] = distr
+		
+		sampler = AncestralSampler(chDistr, featCondDister, 7)
+		for i in range(numSample):
+			(claz, features) = sampler.sample()
+			features[1] = int(features[1])
+			features[2] = int(features[2])
+			claz = addNoiseCat(claz, classes, noise)
+			cid = genID(10) if cids is None else cids[i]
+			rec = cid + "," + toStrFromList(features, 2) + "," + claz
+			print(rec)
+
+	elif op == "recl":
+		#replace class label
+		fpath = sys.argv[2]
+		cl = sys.argv[3]
+		for rec in fileRecGen(fpath, ","):
+			le = len(rec)
+			rec[le - 1] = cl
+			print(",".join(rec))
+
+	elif op == "dish":
+		#add distr shift
+		fpath = sys.argv[2]
+		for rec in fileRecGen(fpath, ","):
+			fi = 1
+			tran = linTrans(float(rec[fi]), 1.21, 30)
+			rec[fi] = tran
+			fi += 1
+			ga = int(linTrans(int(rec[fi]), 0.95, -7))
+			rec[fi] = ga
+			fi += 1
+			du = int(linTrans(int(rec[fi]), 1.4, 200))
+			rec[fi] = du
+			fi += 1
+			srch = int(linTrans(int(rec[fi]), 1.3, 4))
+			rec[fi] = srch
+			fi += 1
+			issue = int(linTrans(int(rec[fi]), 1, 1))
+			rec[fi] = issue
+			fi += 2
+			pissue = int(linTrans(int(rec[fi]), 1, 2))
+			rec[fi] = pissue
+			r = toStrFromList(rec, 2)
+			print(r)
+		
+
+	
 	else:
 		exitWithMsg("invalid command")	
