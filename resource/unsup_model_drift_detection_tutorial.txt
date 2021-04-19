@@ -1,0 +1,59 @@
+This tutorial is for unsupervised concept  drift detection of deployed supervised machine learning  
+models with nearest neighbor count algorithm. We will use ecommerce customer churn data
+
+
+Setup
+=====
+Make sure you have python/lib, python/mlextra and python/supv  directories of avenir project with all the
+python files wrt  where codrift.py is as a peer directory i.e at ../lib , ../mlextra and ../supv
+
+Generate data for no drift case
+===============================
+- generate refrence churn data
+./codrift.py genrc <nsamp> <noise_level> > ch.txt
+where
+bsamp = num of samples e.g 1000
+noise_level = noise level in data e.g 0.05
+
+- set class label to 1
+./codrift.py recl  ch.txt 1 > chref.txt
+
+- generate current churn data
+./codrift.py genrc <nsamp> <noise_level> chref.txt > ch.txt
+
+- set class label to 1
+./codrift.py recl  ch.txt 0 > chnew.txt
+
+- concatenate files
+cat chref.txt > chndr.txt
+cat chnew.txt >> chndr.txt
+
+No drift case
+=============
+- ensure following settings in knn_udr.properties
+train.data.file=chndr.txt
+predict.data.file=chndr.txt
+
+- run
+./codrift.py udrift knn_udr.properties
+
+Generate data for drift case
+============================
+- generate distribution shifted new data
+./codrift.py dish chnew.txt  > chnewd.txt
+
+- concatenate files
+cat chref.txt > chdr.txt
+cat chnewd.txt >> chdr.txt
+
+Drift case
+==========
+- ensure following settings in knn_udr.properties
+train.data.file=chdr.txt
+predict.data.file=chdr.txt
+
+- run
+./codrift.py udrift knn_udr.properties
+
+
+

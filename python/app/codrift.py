@@ -30,7 +30,7 @@ from sucodr import *
 from knn import *
 
 """
-concept drift data generation nd driver
+concept drift data generation 
 """
 
 def linTrans(val, scale, shift):
