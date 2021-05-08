@@ -51,19 +51,35 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	   val subsampleSize = getIntParamOrElse(appConfig, "subsample.size", 100);
 	   val defMaxDepth = Math.log(subsampleSize).toInt
 	   val maxDepth = getIntParamOrElse(appConfig, "max.depth", defMaxDepth);
-	   val countFilePath = getMandatoryStringParam(appConfig, "count.filePath", "missing per key record count file")	
+	   val countFilePath = getOptionalStringParam(appConfig, "count.filePath")	
 	   val modelFilePath = getOptionalStringParam(appConfig, "mod.filePath")	
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3);
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 	   
 	   val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
-	   val perKeyRecCount = BasicUtils.getKeyedValues(countFilePath, keyLen, keyLen).asScala
-	   val perKeyRecSampCount = perKeyRecCount.map(r => {
-	     val rawCount = r._2.toInt
-	     val count = if (rawCount > subsampleSize) subsampleSize else rawCount
-	     (r._1, count)
-	   })
+	   val perKeyRecSampCount = countFilePath match {
+	     case Some(filePath) => {
+	       //many keys
+	       val perKeyRecCount = BasicUtils.getKeyedValues(filePath, keyLen, keyLen).asScala
+	       val perKeyRecSampCount = perKeyRecCount.map(r => {
+	         val rawCount = r._2.toInt
+	         val redSubSampSize = (3 * rawCount) / 4
+	         val count = if (rawCount > subsampleSize) subsampleSize else redSubSampSize
+	         (r._1, count)
+	       })
+	       perKeyRecSampCount
+	     }
+	     
+	     case None => {
+	       //no key
+	       val rCount = getMandatoryIntParam(appConfig, "rec.count", "missing record count")
+	       val redSubSampSize = (3 * rCount) / 4
+	       val count = if (rCount > subsampleSize) subsampleSize else redSubSampSize
+	       val perKeyRecSampCount = Map("all" -> count)
+	       perKeyRecSampCount
+	     }
+	   }
 	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
@@ -72,13 +88,15 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	   //tree id keyed records
 	   val trRecs = keyedData.groupByKey.flatMap(v => {
 	     val key = v._1
+	     val keyStr = key.toString()
 	     val recs = v._2.map(r => r.getString(0)).toArray
 	     val size = recs.length
 	     val trRecs = ArrayBuffer[(Record, String)]()
+	     val ssSize = perKeyRecSampCount.get(keyStr).get
 	     for (i <- 1 to numTree) {	       
-	       val sampleRecs = if (size > subsampleSize) {
-	         val samples = Array.ofDim[String](subsampleSize)
-	         BasicUtils.selectRandomListWithReplacement(recs,samples)
+	       val sampleRecs = if (size > ssSize) {
+	         val samples = Array.ofDim[String](ssSize)
+	         BasicUtils.selectRandomListWithReplacement(recs, samples)
 	         samples
 	       } else {
 	         recs
@@ -150,7 +168,6 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	           val newVal = new String(line)
 	           val pair = (newKey, newVal)
 	           trPathRecs += pair
-	           newKey.addString(2, tPath)
 	         })
 	         
 	       }
@@ -185,7 +202,7 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	     case None =>
 	   }
 
-	   //key by ID
+	   //key by partition ID
 	   val keyedRecs = trPathRecs.groupByKey.flatMap(v => {
 	     val key = v._1
 	     val recs = v._2.toArray
