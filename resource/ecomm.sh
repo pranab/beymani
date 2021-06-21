@@ -125,6 +125,33 @@ case "$1" in
 ;;
 
 
+"bkOutAggr")
+	echo "backing up aggregator output files"
+	OUT_FILES=$PROJECT_HOME/bin/beymani/output/ecom/aggr/*
+	BK_DIR=$PROJECT_HOME/bin/beymani/output/ecom/bkup
+	BK_FILE=$BK_DIR/$2
+	cp /dev/null $BK_FILE
+	for f in $OUT_FILES
+	do
+  		echo "Copying file $f ..."
+  		cat $f >> $BK_FILE
+	done
+	ls -l $BK_FILE
+;;
+
+"orpOlPred")
+	echo "running IsolationForestModel Spark job"
+	CLASS_NAME=org.beymani.spark.multi.IsolationForestModel
+	INPUT=file:///Users/pranab/Projects/bin/beymani/input/ecom/orp/*
+	OUTPUT=file:///Users/pranab/Projects/bin/beymani/output/ecom/orp
+	rm -rf ./output/ecom/orp
+	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
+	--conf spark.ui.killEnabled=true --master $MASTER $BEYMANI_JAR_NAME  $INPUT $OUTPUT ecomm.conf
+	rm ./output/ecom/orp/_SUCCESS
+	ls -l ./output/ecom/orp
+	cat ./output/ecom/orp/part-00000 | grep ,O 
+;;
+	
 *) 
 	echo "unknown operation $1"
 	;;

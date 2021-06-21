@@ -208,11 +208,13 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	     val recs = v._2.toArray
 	     recs.map(v => {
 	       val newKey = Record(keyLen, key)
+	       
+	       //move tree ID and path to value
 	       val newVal = Record(3)
 	       newVal.addInt(key.getInt(keyLen))
 	       newVal.addString(key.getString(keyLen + 1))
-	       newKey.addString(v)
-	       (newKey, newKey)
+	       newVal.addString(v)
+	       (newKey, newVal)
 	     })
 	   })
 	   
@@ -225,6 +227,9 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	     val avTreePathLen = avgPathLength(recCount)
 	     val recs = v._2.toArray
 	     val taggedRecs = ArrayBuffer[String]()
+	     if (debugOn){
+	       println("key " + keyStr + " tree recCount " + recCount + " avTreePathLen " + avTreePathLen + "num recs " + recs.length)
+	     }
 	     
 	     //keyed by tree ID and path
 	     var tpaRecs = Map[Record, ArrayBuffer[String]]()
@@ -245,6 +250,11 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	       val lines = tpaRecs.get(tKey).get
 	       val size = lines.length
 	       val score = (if (size == 1) tPathLen else tPathLen + avgPathLength(size)).toDouble
+	       if (debugOn) {
+	         println("tPathLen " + tPathLen + " size " + size  + " score " + BasicUtils.formatDouble(score, precision)) 
+	       }
+	       
+	       //val score = tPathLen
 	       lines.foreach(line => {
 	         val lineScores = scores.getOrElse(line, ArrayBuffer[Double]())
 	         if (lineScores.length == 0) {
@@ -253,15 +263,24 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	         lineScores += score
 	       })
 	       
-	       //average path length and anomaly score
-	       val avScores = scores.map(r => {
-	         val avgPathLen = getDoubleSeqAverage(r._2)
-	         val score = Math.pow(2.0, - avgPathLen / avTreePathLen)
-	         val tag = if (score > scoreThreshold) "O" else "N"
-	         val taggedRec = r._1 + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + tag
-	         taggedRecs += taggedRec
-	       })
 	     })
+	       
+	     if (debugOn) {
+	       println("map size " + scores.size)
+	     }
+	       
+	     //average path length and anomaly score
+	     val avScores = scores.map(r => {
+	       val avgPathLen = getDoubleSeqAverage(r._2)
+	       if (debugOn) {
+	         println("av path length " + BasicUtils.formatDouble(avgPathLen, precision))
+	       }
+	       val score = Math.pow(2.0, - avgPathLen / avTreePathLen)
+	       val tag = if (score > scoreThreshold) "O" else "N"
+	       val taggedRec = r._1 + fieldDelimOut + BasicUtils.formatDouble(score, precision) + fieldDelimOut + tag
+	       taggedRecs += taggedRec
+	     })
+	       
 	     taggedRecs
 	   })
 	   
