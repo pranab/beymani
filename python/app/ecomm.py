@@ -554,6 +554,40 @@ if __name__ == "__main__":
 				
 		olfile.close()
 		
+	elif op == "filtOrdPrOl":			
+		"""
+		shows expected outliers
+		"""
+		outFilePath = sys.argv[2]
+		olFilePath = sys.argv[3]
+		
+		tdataOl = getFileLines(olFilePath)
+		fnCount = 0
+		fpCount = 0
+		tpCount = 0
+		for rec in fileRecGen(outFilePath):
+			r = rec[:-2]
+			matched = list(filter(lambda ro : ro == r, tdataOl))
+			if len(matched) == 1:
+				print(",".join(rec))
+				if rec[-1] == "N":
+					fnCount += 1
+				else:
+					tpCount += 1
+			else:
+				if rec[-1] == "O":
+					fpCount += 1
+				
+		print("false pos {}  false neg {}".format(fpCount, fnCount))	
+		preci = tpCount / (tpCount + fpCount)
+		recal = tpCount / (tpCount + fnCount)
+		print("precision {:.3f}   recall {:.3f}".format(preci, recal))
+				
+		
+		
+
+		
+		
 				
 				
 

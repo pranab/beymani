@@ -117,7 +117,11 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	   //grow tree
 	   var done = false
 	   var trPathRecs = trRecs
+	   var trExpIter = 1
 	   while (!done) {
+	     if (debugOn) {
+	       println("trExpIter " + trExpIter)
+	     }
 	     trPathRecs = trPathRecs.groupByKey.flatMap(v => {
 	       val key = v._1
 	       val recs = v._2.toArray
@@ -137,31 +141,44 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	           trPathRecs += pair
 	         })
 	       } else {
-	         val spltAttr = BasicUtils.selectRandom(attrOrds)
+	         
 	         var minVal = Double.MaxValue
 	         var maxVal = Double.MinValue
-	         recs.foreach(line => {
-	           val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
-	           val quant = items(spltAttr).toDouble
-	           if (quant < minVal) {
-	             minVal = quant
-	           } 
-	           if(quant > minVal){
-	              maxVal = quant 
-	           }
-	         })
-	         val splitVal  = minVal + Math.random() * (maxVal - maxVal)
-	         val spKeyLt = "" + spltAttr + "-" + BasicUtils.formatDouble(splitVal, 6) + "-" + "LT"
-	         val spKeyGe = "" + spltAttr + "-" + BasicUtils.formatDouble(splitVal, 6) + "-" + "GE"
+	         var found = false
+	         var spltAttr = -1
+	         while(!found) {
+  	         spltAttr = BasicUtils.selectRandom(attrOrds)
+  	         recs.foreach(line => {
+  	           val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
+  	           val quant = items(spltAttr).toDouble
+  	           if (quant < minVal) {
+  	             minVal = quant
+  	           } 
+  	           if(quant > maxVal){
+  	              maxVal = quant 
+  	           }
+  	         })
+  	         found = (maxVal - minVal) > .001
+  	         if (debugOn && !found){
+  	           println("not enough range in attribute " + spltAttr)
+  	         }
+	         }
+	         val splitVal  = minVal + Math.random() * (maxVal - minVal)
+	         if (debugOn) {
+	           println("spltAttr" + spltAttr + " minVal " + minVal + " maxVal " + maxVal + " splitVal " + splitVal)
+	         }
+	         val spKeyLt = "" + spltAttr + "@" + BasicUtils.formatDouble(splitVal, 6) + "@" + "LT"
+	         val spKeyGe = "" + spltAttr + "@" + BasicUtils.formatDouble(splitVal, 6) + "@" + "GE"
+	         val tPathLt = if (key.getString(2).isEmpty()) spKeyLt else key.getString(2) + ":" + spKeyLt
+	         val tPathGe = if (key.getString(2).isEmpty()) spKeyLt else key.getString(2) + ":" + spKeyGe
+	         
 	         recs.foreach(line => {
 	           val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 	           val quant = items(spltAttr).toDouble
 	           val tPath = if (quant < splitVal) {
-	             val tPath = if (key.getString(2).isEmpty()) spKeyLt else key.getString(2) + ":" + spKeyLt
-	             tPath
+	             tPathLt
 	           } else {
-	             val tPath = if (key.getString(2).isEmpty()) spKeyLt else key.getString(2) + ":" + spKeyGe
-	             tPath
+	             tPathGe
 	           }
 	           val newKey = Record(key)
 	           newKey.addString(2, tPath)
@@ -186,10 +203,17 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	       val depth = if (tPath.isEmpty()) 0 else tPath.split(":").length
 	       val newKey = Record(key)
 	       val isInternal = !(size == 1 || depth == maxDepth)
+	       if (debugOn) {
+	         println("tPath " + tPath + " size " + size + " depth " + depth)
+	       }
 	       (newKey, isInternal)
 	     }).filter(r => r._2).count()
 	     
 	     done = interNodeCount == 0
+	     if (debugOn) {
+	       println("interNodeCount " + interNodeCount)
+	     }
+	     trExpIter += 1
 	   }
 	   
 	   //save model including sub population count for the path
@@ -228,7 +252,7 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	     val recs = v._2.toArray
 	     val taggedRecs = ArrayBuffer[String]()
 	     if (debugOn){
-	       println("key " + keyStr + " tree recCount " + recCount + " avTreePathLen " + avTreePathLen + "num recs " + recs.length)
+	       //println("key " + keyStr + " tree recCount " + recCount + " avTreePathLen " + avTreePathLen + "num recs " + recs.length)
 	     }
 	     
 	     //keyed by tree ID and path
@@ -251,7 +275,7 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	       val size = lines.length
 	       val score = (if (size == 1) tPathLen else tPathLen + avgPathLength(size)).toDouble
 	       if (debugOn) {
-	         println("tPathLen " + tPathLen + " size " + size  + " score " + BasicUtils.formatDouble(score, precision)) 
+	         //println("tPathLen " + tPathLen + " size " + size  + " score " + BasicUtils.formatDouble(score, precision)) 
 	       }
 	       
 	       //val score = tPathLen
