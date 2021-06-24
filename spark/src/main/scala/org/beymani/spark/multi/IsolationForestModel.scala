@@ -128,11 +128,12 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	       val size = recs.length
 	       
 	       //current depth
-	       val tPath = key.getString(2)
-	       val depth = if (tPath.isEmpty()) 0 else tPath.split(":").length
+	       //val nonSplittable = (key.getInt(1) >> 8) == 1
+	       //val tPath = key.getString(2)
+	       //val depth = if (tPath.isEmpty()) 0 else tPath.split(":").length
 	       
 	       val trPathRecs = ArrayBuffer[(Record, String)]()
-	       if (depth == maxDepth || size == 1) {
+	       if (isTerminal(key, maxDepth, size)) {
 	         //can not grow any more
 	         recs.foreach(v => {
 	           val newKey = Record(key)
@@ -141,12 +142,14 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	           trPathRecs += pair
 	         })
 	       } else {
-	         
+	         //non terminal
 	         var minVal = Double.MaxValue
 	         var maxVal = Double.MinValue
 	         var found = false
 	         var spltAttr = -1
-	         while(!found) {
+	         val maxTryCnt = 2 * attrOrds.length
+	         var tryCnt = 0
+	         while(!found && tryCnt < maxTryCnt) {
   	         spltAttr = BasicUtils.selectRandom(attrOrds)
   	         recs.foreach(line => {
   	           val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
@@ -160,33 +163,52 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
   	         })
   	         found = (maxVal - minVal) > .001
   	         if (debugOn && !found){
-  	           println("not enough range in attribute " + spltAttr)
+  	           //println("not enough range in attribute " + spltAttr)
   	         }
+  	         tryCnt += 1
 	         }
-	         val splitVal  = minVal + Math.random() * (maxVal - minVal)
-	         if (debugOn) {
-	           println("spltAttr" + spltAttr + " minVal " + minVal + " maxVal " + maxVal + " splitVal " + splitVal)
+	         
+	         if (!found) {
+	           //mark  not as not expandable
+	           recs.foreach(v => {
+	             val newKey = Record(key)
+	             var trId = newKey.getInt(1)
+	             trId = trId | (1 << 12)
+	             newKey.addInt(1, trId)
+	             val newVal = new String(v)
+	             val pair = (newKey, newVal)
+	             trPathRecs += pair
+	             if (debugOn) {
+	               println("marking node as not expandable path " + newKey.getString(2))
+	             }
+	           })
 	         }
-	         val spKeyLt = "" + spltAttr + "@" + BasicUtils.formatDouble(splitVal, 6) + "@" + "LT"
-	         val spKeyGe = "" + spltAttr + "@" + BasicUtils.formatDouble(splitVal, 6) + "@" + "GE"
-	         val tPathLt = if (key.getString(2).isEmpty()) spKeyLt else key.getString(2) + ":" + spKeyLt
-	         val tPathGe = if (key.getString(2).isEmpty()) spKeyLt else key.getString(2) + ":" + spKeyGe
-	         
-	         recs.foreach(line => {
-	           val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
-	           val quant = items(spltAttr).toDouble
-	           val tPath = if (quant < splitVal) {
-	             tPathLt
-	           } else {
-	             tPathGe
-	           }
-	           val newKey = Record(key)
-	           newKey.addString(2, tPath)
-	           val newVal = new String(line)
-	           val pair = (newKey, newVal)
-	           trPathRecs += pair
-	         })
-	         
+	         else {
+	           //split and expand
+  	         val splitVal  = minVal + Math.random() * (maxVal - minVal)
+  	         if (debugOn) {
+  	           println("spltAttr" + spltAttr + " minVal " + minVal + " maxVal " + maxVal + " splitVal " + splitVal)
+  	         }
+  	         val spKeyLt = "" + spltAttr + "@" + BasicUtils.formatDouble(splitVal, 6) + "@" + "LT"
+  	         val spKeyGe = "" + spltAttr + "@" + BasicUtils.formatDouble(splitVal, 6) + "@" + "GE"
+  	         val tPathLt = if (key.getString(2).isEmpty()) spKeyLt else key.getString(2) + ":" + spKeyLt
+  	         val tPathGe = if (key.getString(2).isEmpty()) spKeyLt else key.getString(2) + ":" + spKeyGe
+  	         
+  	         recs.foreach(line => {
+  	           val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
+  	           val quant = items(spltAttr).toDouble
+  	           val tPath = if (quant < splitVal) {
+  	             tPathLt
+  	           } else {
+  	             tPathGe
+  	           }
+  	           val newKey = Record(key)
+  	           newKey.addString(2, tPath)
+  	           val newVal = new String(line)
+  	           val pair = (newKey, newVal)
+  	           trPathRecs += pair
+  	         })
+	         }
 	       }
 	       trPathRecs
 	     })
@@ -199,11 +221,11 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	       val size = recs.length
 	       
 	       //current depth
-	       val tPath = key.getString(2)
-	       val depth = if (tPath.isEmpty()) 0 else tPath.split(":").length
 	       val newKey = Record(key)
-	       val isInternal = !(size == 1 || depth == maxDepth)
+	       val isInternal = !isTerminal(key, maxDepth, size)
 	       if (debugOn) {
+	         val tPath = key.getString(2)
+	         val depth = if (tPath.isEmpty()) 0 else tPath.split(":").length
 	         println("tPath " + tPath + " size " + size + " depth " + depth)
 	       }
 	       (newKey, isInternal)
@@ -322,6 +344,13 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
    def avgPathLength(count : Int) : Double = {
      val dCount = count.toDouble
      2.0 * ((Math.log(dCount - 1) + 0.5772156649) -  (dCount - 1) / dCount)
+   }
+   
+   def isTerminal(key : Record, maxDepth : Int, size : Int) : Boolean = {
+	   val nonSplittable = (key.getInt(1) >> 12) == 1
+	   val tPath = key.getString(2)
+	   val depth = if (tPath.isEmpty()) 0 else tPath.split(":").length
+     depth == maxDepth || size == 1 || nonSplittable
    }
   
 }
