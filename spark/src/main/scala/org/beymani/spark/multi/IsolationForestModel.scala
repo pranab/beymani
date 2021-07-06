@@ -27,6 +27,9 @@ import scala.collection.mutable.ArrayBuffer
 import org.beymani.spark.common.OutlierUtility
 import org.chombo.util.BasicUtils
 
+/**
+* Implements Isolation forest 
+*/
 object IsolationForestModel extends JobConfiguration with GeneralUtility with OutlierUtility  {
   
    /**
@@ -44,6 +47,7 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	   //configurations
 	   val fieldDelimIn = getStringParamOrElse(appConfig, "field.delim.in", ",")
 	   val fieldDelimOut = getStringParamOrElse(appConfig, "field.delim.out", ",")
+	   val opMode = getStringParamOrElse(appConfig, "op.mode", "norm");
 	   val keyFieldOrdinals = toOptionalIntArray(getOptionalIntListParam(appConfig, "id.fieldOrdinals"))
 	   val attrOrds = toIntegerArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
 	   val scoreThreshold = getMandatoryDoubleParam(appConfig, "score.threshold", "missing score threshold")	
@@ -83,36 +87,47 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	   
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
-	   val keyedData = getKeyedValue(data, fieldDelimIn, keyLen, keyFieldOrdinals)
 	   
-	   //tree id keyed records
-	   val trRecs = keyedData.groupByKey.flatMap(v => {
-	     val key = v._1
-	     val keyStr = key.toString()
-	     val recs = v._2.map(r => r.getString(0)).toArray
-	     val size = recs.length
-	     val trRecs = ArrayBuffer[(Record, String)]()
-	     val ssSize = perKeyRecSampCount.get(keyStr).get
-	     for (i <- 1 to numTree) {	       
-	       val sampleRecs = if (size > ssSize) {
-	         val samples = Array.ofDim[String](ssSize)
-	         BasicUtils.selectRandomListWithReplacement(recs, samples)
-	         samples
-	       } else {
-	         recs
-	       }
+	   val trRecs = opMode match {
+	     case("norm") => {
+	       //normal
+	       val keyedData = getKeyedValue(data, fieldDelimIn, keyLen, keyFieldOrdinals)
+	   
+    	   //tree id keyed records
+    	   keyedData.groupByKey.flatMap(v => {
+    	     val key = v._1
+    	     val keyStr = key.toString()
+    	     val recs = v._2.map(r => r.getString(0)).toArray
+    	     val size = recs.length
+    	     val trRecs = ArrayBuffer[(Record, String)]()
+    	     val ssSize = perKeyRecSampCount.get(keyStr).get
+    	     for (i <- 1 to numTree) {	       
+    	       val sampleRecs = if (size > ssSize) {
+    	         val samples = Array.ofDim[String](ssSize)
+    	         BasicUtils.selectRandomListWithReplacement(recs, samples)
+    	         samples
+    	       } else {
+    	         recs
+    	       }
+    	       
+    	       sampleRecs.foreach(r => {
+    	         val tKey = Record(keyLen+2, key)
+    	         tKey.addInt(i)
+    	         tKey.addString("")
+    	         val pair = (tKey, r)
+    	         trRecs += pair
+    	       })
+    	     }
+    	     
+    	     trRecs
+    	   })
 	       
-	       sampleRecs.foreach(r => {
-	         val tKey = Record(keyLen+2, key)
-	         tKey.addInt(i)
-	         tKey.addString("")
-	         val pair = (tKey, r)
-	         trRecs += pair
-	       })
 	     }
-	     
-	     trRecs
-	   })
+	     case("incr") => {
+	       //incremental, exiting path data merged with new incremental data
+	       getMandatoryKeyedValue(data, fieldDelimIn, keyLen+2)
+	     }
+	   }
 
 	   //grow tree
 	   var done = false
@@ -238,12 +253,19 @@ object IsolationForestModel extends JobConfiguration with GeneralUtility with Ou
 	     trExpIter += 1
 	   }
 	   
-	   //save model including sub population count for the path
+	   //save model 
 	   modelFilePath match {
 	     case Some(filePath) => {
-	       val trPathWithCnt = trPathRecs.map(r => {(r._1, 1)}).reduceByKey((v1, v2) => {v1 + v2}).
-	         map(r => {r._1.toString(fieldDelimOut) + fieldDelimOut + r._2})
-	       trPathWithCnt.saveAsTextFile(filePath) 
+	       trPathRecs.cache
+	       val trPathRecsStr = trPathRecs.map(r => {
+	         //remove non splittable bit and stringify
+	         val key = r._1
+	         val trID = key.getInt(keyLen) & (1 << 11)
+	         key.addInt(keyLen, trID)
+	         val value = r._2
+	         key.toString(fieldDelimOut) + fieldDelimOut + value
+	       })
+	       trPathRecsStr.saveAsTextFile(filePath) 
 	     }
 	     case None =>
 	   }
