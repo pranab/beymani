@@ -21,7 +21,7 @@ noise_level = noise level in data e.g 0.05
 - generate current churn data
 ./codrift.py genrc <nsamp> <noise_level> chref.txt > ch.txt
 
-- set class label to 1
+- set class label to 0
 ./codrift.py recl  ch.txt 0 > chnew.txt
 
 - concatenate files
@@ -39,7 +39,7 @@ predict.data.file=chndr.txt
 
 Generate data for drift case
 ============================
-- generate distribution shifted new data
+- generate distribution shifted new data for second half
 ./codrift.py dish chnew.txt  > chnewd.txt
 
 - concatenate files

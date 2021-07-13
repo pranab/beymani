@@ -22,6 +22,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib
+from sklearn.neighbors import KDTree
 import random
 import jprops
 import statistics as stat
@@ -359,3 +360,53 @@ class SupConceptDrift(object):
 		return self.aggregateDrift(values, dcount)
 		
 
+class UnsupConceptDrift(object):
+	"""
+	un supervised cpncept drift detection
+	"""
+	def __init__(self):
+		pass
+
+	def localDrift(self, tData, neighborhoodSize, topDriftCnt):
+		"""
+		local drift detection
+		"""
+		l = len(tData)
+		lh = int(l / 2)
+		nCount = int(l * neighborhoodSize)
+		tree = KDTree(tData, leaf_size=2)
+		
+		nDist, nInd = tree.query(tData, k=nCount)
+		drifts = list()
+		for si, nia in enumerate(nInd):
+			oCount = 0
+			for ni in nia:
+				#hypothesis forst half of data belongs to class and the second half another
+				if si < lh:
+					if ni >= lh:
+						oCount += 1
+				else:
+					if ni < lh:
+						oCount += 1
+			tCount = nCount - oCount
+			tCount = tCount if tCount > 0 else 1
+			dr = oCount / tCount - 1.0
+			pair = (si, dr)
+			drifts.append(pair)
+			
+		drifts = sorted(drifts, key=lambda d : abs(d[1]), reverse=True)
+		print("local drift in desending order of drift")
+		print("drift\trecord")
+			
+		for i in range(topDriftCnt):
+			si, dr = drifts[i]
+			rec = toStrFromList(tData[si], 3)
+			print("{:.3f}\t{}".format(dr, rec))
+	
+		dr = list(map(lambda d : d[1], drifts))
+		drawHist(dr, "local drift distribution", "drift", "frequency")
+						
+			
+			
+		
+	

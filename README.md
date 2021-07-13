@@ -21,6 +21,7 @@ The following blogs of mine are good source of details of beymani
 * https://pkghosh.wordpress.com/2020/09/27/time-series-change-point-detection-with-two-sample-statistic-on-spark-with-application-for-retail-sales-data/
 * https://pkghosh.wordpress.com/2020/12/24/concept-drift-detection-techniques-with-python-implementation-for-supervised-machine-learning-models/
 * https://pkghosh.wordpress.com/2021/01/20/customer-service-quality-monitoring-with-autoencoder-based-anomalous-case-detection/
+* https://pkghosh.wordpress.com/2021/06/28/ecommerce-order-processing-system-monitoring-with-isolation-forest-based-anomaly-detection-on-spark/
 
 ## Algorithms
 * Univarite  distribution model

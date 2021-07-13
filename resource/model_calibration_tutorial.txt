@@ -1,0 +1,19 @@
+This tutorial is for finding  calibration properties of a machine lrarning model.
+
+Setup
+=====
+Make sure you have ../lib  ../supv directories with all the python files in there wrt 
+where heart_disease.py is. Alternatively you can use ../python/app directory of avenir as
+your working directory
+
+Generate data and train model
+=============================
+Please refer to heart_disease_prediction_with_random_forest_tutorial.txt
+
+Global calibration
+==================
+./heart_disease.py calib
+
+Local caliv=bration
+===================
+./heart_disease.py calibLoc

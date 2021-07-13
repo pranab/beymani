@@ -21,6 +21,7 @@ import sys
 import random
 import statistics 
 import matplotlib.pyplot as plt 
+from sklearn.neighbors import KDTree
 sys.path.append(os.path.abspath("../lib"))
 sys.path.append(os.path.abspath("../mlextra"))
 sys.path.append(os.path.abspath("../supv"))
@@ -277,6 +278,54 @@ if __name__ == "__main__":
 			rec[fi] = pissue
 			r = toStrFromList(rec, 2)
 			print(r)
+		
+	elif op == "ludrift":
+		#add distr shift
+		fPath = sys.argv[2]
+		selFieldIndices = [1,2,3,4,5,6,7,8]
+		featFieldIndices = [0,1,2,3,4,5,6]
+		(aData, fData) = loadDataFile(fPath, ",", selFieldIndices, featFieldIndices)
+		l = len(fData)
+		lh = int(l/2)
+		nSize = float(sys.argv[3])
+		
+		if len(sys.argv) == 5:
+			print("with drift case")
+			ai = int(l * randomFloat(.48, .52))	
+			aData = fData[ai]
+			nCount = int(float(sys.argv[4]) * l)
+			tree = KDTree(fData, leaf_size=2)
+		
+			nDist, nInd = tree.query([aData], k=nCount)
+			neighbors = nInd[0]
+		else:
+			neighbors = None
+			print("no drift case")
+		
+		for i in range(l):
+			rec = fData[i]
+			if neighbors is not None and  i >= lh and i in neighbors:
+				fi = 0
+				tran = linTrans(rec[fi], 1.1, 30)
+				rec[fi] = tran
+				fi += 1
+				ga = int(linTrans(rec[fi], 0.95, -6))
+				rec[fi] = float(ga)
+				fi += 1
+				du = int(linTrans(rec[fi], 1.2, 120))
+				rec[fi] = float(du)
+				fi += 1
+				srch = int(linTrans(rec[fi], 1.3, 2))
+				rec[fi] = float(srch)
+				fi += 1
+				issue = int(linTrans(rec[fi], 1, 1))
+				rec[fi] = float(issue)
+				fi += 2
+				pissue = int(linTrans(rec[fi], 1, 1))
+				rec[fi] = float(pissue)
+		
+		dd = UnsupConceptDrift()
+		dd.localDrift(fData, nSize, 50)
 		
 	elif op == "udrift":
 		#unsupervised drift detection with knn classifier
