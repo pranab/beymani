@@ -36,7 +36,47 @@ concept drift data generation
 
 def linTrans(val, scale, shift):
 	return val * scale + shift
-	
+
+def addDrift(fpath, dLoc=None, outPath=None):
+	""" modify for dtift """
+	i = 0
+	wrFile =  outPath is not None
+	if wrFile:
+		ofile = open(outPath, "w")
+
+	for rec in fileRecGen(fpath):
+		if dLoc is not None and i > dLoc:
+			fi = 1
+			tran = linTrans(float(rec[fi]), 1.1, 30)
+			rec[fi] = tran
+			fi += 1
+			ga = int(linTrans(int(rec[fi]), 0.95, -6))
+			rec[fi] = ga
+			fi += 1
+			du = int(linTrans(int(rec[fi]), 1.2, 120))
+			rec[fi] = du
+			fi += 1
+			srch = int(linTrans(int(rec[fi]), 1.3, 2))
+			rec[fi] = srch
+			fi += 1
+			issue = int(linTrans(int(rec[fi]), 1, 1))
+			rec[fi] = issue
+			fi += 2
+			pissue = int(linTrans(int(rec[fi]), 1, 1))
+			rec[fi] = pissue
+			r = toStrFromList(rec, 2)
+		else:
+			r = ",".join(rec)
+			
+		if wrFile:
+			ofile.write(r + "\n")
+		else:
+			print(r)
+		i += 1
+			
+	if wrFile:
+		ofile.close()
+					
 if __name__ == "__main__":
 	op = sys.argv[1]
 	if op == "agen":
@@ -280,7 +320,7 @@ if __name__ == "__main__":
 			print(r)
 		
 	elif op == "ludrift":
-		#add distr shift
+		#local drift detection with knn
 		fPath = sys.argv[2]
 		selFieldIndices = [1,2,3,4,5,6,7,8]
 		featFieldIndices = [0,1,2,3,4,5,6]
@@ -289,11 +329,12 @@ if __name__ == "__main__":
 		lh = int(l/2)
 		nSize = float(sys.argv[3])
 		
-		if len(sys.argv) == 5:
+		if len(sys.argv) == 6:
 			print("with drift case")
-			ai = int(l * randomFloat(.48, .52))	
+			dl = float(sys.argv[4])
+			ai = int(l * randomFloat(dl - 0.02, dl + 0.02))	
 			aData = fData[ai]
-			nCount = int(float(sys.argv[4]) * l)
+			nCount = int(float(sys.argv[5]) * l)
 			tree = KDTree(fData, leaf_size=2)
 		
 			nDist, nInd = tree.query([aData], k=nCount)
@@ -331,6 +372,16 @@ if __name__ == "__main__":
 		#unsupervised drift detection with knn classifier
 		cfPath = sys.argv[2]
 		knnClass = NearestNeighbor(cfPath)
+		dl = 0.0
+		if len(sys.argv) > 3:
+			fPath = sys.argv[3]
+			lc = fileLineCount(fPath)
+			print(lc)
+			dl = float(sys.argv[4])
+			dLoc = int((1.0 - dl) * lc)
+			trFilePath = knnClass.getConfig().getStringConfig("train.data.file")[0]
+			addDrift(fPath, dLoc, trFilePath)
+		
 		knnClass.train()
 		cres = knnClass.predictProb()
 		prl = list()
@@ -339,7 +390,7 @@ if __name__ == "__main__":
 			prl.append(pr)
 			print(r)
 		mpr = statistics.mean(prl)	
-		print("mean prediction probability {:.3f}".format(mpr))
+		print("drift progress percentage {:.3f}   mean prediction probability {:.3f}".format(100 * dl, mpr))
 		
 	else:
 		exitWithMsg("invalid command")	
