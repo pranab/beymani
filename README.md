@@ -35,6 +35,8 @@ The following blogs of mine are good source of details of beymani
 * Instance clustering
 * Sequence clustering
 * Change point detection
+* Isolation Forest for sequence data
+* Auto Encoder for sequence data
 
 ## Getting started
 Project's resource directory has various tutorial documents for the use cases described in
